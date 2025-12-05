@@ -1,0 +1,20 @@
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/**/*.pyc
+
+# Frontend (current location)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Env files
+backend/.env
+backend/.env.*
+frontend/.env*
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db

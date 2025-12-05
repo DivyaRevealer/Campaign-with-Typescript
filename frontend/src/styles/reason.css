@@ -1,0 +1,100 @@
+.reason-cell {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  vertical-align: top;
+}
+
+.reason-inline {
+  display: inline-block;
+  max-width: 14rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  outline: none;
+}
+
+.reason-inline:focus-visible {
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.45);
+  border-radius: 4px;
+}
+
+.reason-popover {
+  position: fixed;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%) scale(0.98);
+  z-index: 1300;
+  min-width: clamp(240px, 60vw, 520px);
+  max-width: min(520px, 90vw);
+  padding: 20px 24px 18px;
+  border-radius: 16px;
+  line-height: 1.55;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(248, 250, 252, 0.96);
+  color: #201f1e;
+  word-break: break-word;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.reason-popover--visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.reason-popover--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.reason-popover__close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: none;
+  background: transparent;
+  color: #201f1e;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.reason-popover__close:hover,
+.reason-popover__close:focus-visible {
+  background: rgba(148, 163, 184, 0.18);
+  color: #1e293b;
+  outline: none;
+}
+
+.reason-popover__content {
+  font-size: 14px;
+  font-weight: 500;
+  margin-right: 24px;
+  white-space: pre-wrap;
+}
+
+body[data-admin-theme="dark"] .reason-popover {
+  background: rgba(30, 41, 59, 0.95);
+  color: #f8fafc;
+  border-color: rgba(148, 163, 184, 0.4);
+  box-shadow: 0 18px 45px rgba(2, 6, 23, 0.6);
+}
+
+body[data-admin-theme="dark"] .reason-popover__close {
+  color: #f8fafc;
+}
+
+body[data-admin-theme="dark"] .reason-popover__close:hover,
+body[data-admin-theme="dark"] .reason-popover__close:focus-visible {
+  background: rgba(148, 163, 184, 0.25);
+  color: #e2e8f0;
+}
+
+.reason-empty {
+  color: var(--admin-muted-text, #94a3b8);
+}

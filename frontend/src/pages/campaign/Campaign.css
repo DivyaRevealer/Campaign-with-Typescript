@@ -1,0 +1,28 @@
+.campaign-page {
+  padding: 24px;
+}
+
+.campaign-header {
+  margin-bottom: 24px;
+}
+
+.campaign-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--ims-text-primary, #1a1a1a);
+}
+
+.campaign-header p {
+  margin: 0;
+  color: var(--ims-text-secondary, #666);
+  font-size: 14px;
+}
+
+.campaign-content {
+  background: var(--ims-bg-secondary, #fff);
+  border-radius: 8px;
+  padding: 24px;
+  min-height: 400px;
+}
+

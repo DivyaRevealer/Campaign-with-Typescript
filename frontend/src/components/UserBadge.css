@@ -1,0 +1,40 @@
+.user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--admin-card-border);
+  background: var(--admin-card-bg);
+  color: var(--admin-page-text);
+  font-size: 13px;
+  line-height: 1.1;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+}
+
+.user-badge__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #66b0ff, #0f6cbd);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.user-badge__label {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-badge__label span {
+  display: block;
+}
+
+.user-badge__label small {
+  font-size: 11px;
+  opacity: 0.7;
+}

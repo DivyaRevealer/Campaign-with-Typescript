@@ -1,0 +1,33 @@
+{
+  "search_results": {
+    "AC1": { "requirements_contains_slowapi": true },
+    "AC2": { "main_init_rate_limiter_present": true },
+    "AC3": {
+      "salesorders_upload_decorated": true,
+      "production_upload_decorated": true
+    },
+    "AC4": {
+      "body_size_middleware_defined": true,
+      "body_size_middleware_registered": true
+    },
+    "AC5": { "excel_upload_rate_defined": true },
+    "AC6": {
+      "salesorders_anyio_import_normalized": true,
+      "production_anyio_import_normalized": true
+    },
+    "AC7": {
+      "rate_limit_handler_registered_via_add_exception_handler": true,
+      "no_decorator_present_in_rate_limit_init": true
+    }
+  },
+  "edited_files": [
+    "backend/requirements.txt",
+    "backend/app/core/rate_limit.py",
+    "backend/app/core/middleware.py",
+    "backend/app/core/config.py",
+    "backend/app/main.py",
+    "backend/app/api/routes/salesorders.py",
+    "backend/app/api/routes/production.py"
+  ],
+  "notes": "Add SlowAPI rate limits to Excel upload endpoints and early body-size cutoff. Normalize AnyIO TimeoutError imports and register SlowAPI handler via add_exception_handler."
+}
