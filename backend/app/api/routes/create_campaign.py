@@ -204,6 +204,17 @@ async def get_campaign_options(
                 return int(value)
             except (ValueError, TypeError):
                 return None
+        def clean_scores(raw_values) -> list[int]:
+            """Convert DB values to clean integer lists for the API response."""
+
+            cleaned: list[int] = []
+            for value in raw_values:
+                int_val = safe_int(value)
+                if int_val is not None:
+                    cleaned.append(int_val)
+            # Remove duplicates, sort, and return
+            unique_sorted = sorted(set(cleaned))
+            return unique_sorted if unique_sorted else [1, 2, 3, 4, 5]
         
         try:
             # Query R scores (matching reference: distinct, ordered, filter None)
@@ -211,59 +222,17 @@ async def get_campaign_options(
                 InvCrmAnalysis.r_score.isnot(None)
             ).order_by(InvCrmAnalysis.r_score)
             r_results = (await session.execute(r_score_query)).scalars().all()
-            # Convert to int safely - ensure Python int type (not Decimal, float, etc.)
-            r_scores = []
-            for r in r_results:
-                if r is not None:
-                    try:
-                        # Force conversion to Python int
-                        int_val = int(r)
-                        # Only add if it's actually a Python int (not a subclass)
-                        if isinstance(int_val, int) and type(int_val) is int:
-                            r_scores.append(int_val)
-                    except (ValueError, TypeError, AttributeError):
-                        continue
-            r_scores = sorted(set(r_scores))  # Remove duplicates and sort
-            
-            # Query F scores
+            r_scores = clean_scores(r_results)
             f_score_query = select(InvCrmAnalysis.f_score).distinct().where(
                 InvCrmAnalysis.f_score.isnot(None)
             ).order_by(InvCrmAnalysis.f_score)
             f_results = (await session.execute(f_score_query)).scalars().all()
-            f_scores = []
-            for f in f_results:
-                if f is not None:
-                    try:
-                        int_val = int(f)
-                        if isinstance(int_val, int) and type(int_val) is int:
-                            f_scores.append(int_val)
-                    except (ValueError, TypeError, AttributeError):
-                        continue
-            f_scores = sorted(set(f_scores))
-            
-            # Query M scores
+            f_scores = clean_scores(f_results)
             m_score_query = select(InvCrmAnalysis.m_score).distinct().where(
                 InvCrmAnalysis.m_score.isnot(None)
             ).order_by(InvCrmAnalysis.m_score)
             m_results = (await session.execute(m_score_query)).scalars().all()
-            m_scores = []
-            for m in m_results:
-                if m is not None:
-                    try:
-                        int_val = int(m)
-                        if isinstance(int_val, int) and type(int_val) is int:
-                            m_scores.append(int_val)
-                    except (ValueError, TypeError, AttributeError):
-                        continue
-            m_scores = sorted(set(m_scores))
-            
-            # Default to 1-5 if no scores found
-            if not r_scores:
-                r_scores = [1, 2, 3, 4, 5]
-            if not f_scores:
-                f_scores = [1, 2, 3, 4, 5]
-            if not m_scores:
-                m_scores = [1, 2, 3, 4, 5]
+            m_scores = clean_scores(m_results)
         except Exception as e:
             # If table doesn't exist or error, use defaults 1-5
             import logging
