@@ -514,33 +514,33 @@ async def get_template_details(
                         # Compare case-insensitively and handle variations
                         name_lower = str(name).lower().strip()
                         if name_lower == template_name_lower or name == template_name:
-                        # Create a TemplateDetailOut from API data
-                        # Infer template_type from category
-                        category = api_template.get("category", "text")
-                        template_type = "text" if category.lower() in ["text", "utility"] else "media"
-                        
-                        # Infer media_type from components
-                        media_type = None
-                        components = api_template.get("components", [])
-                        if components:
-                            header = next((c for c in components if c.get("type") == "HEADER"), None)
-                            if header:
-                                format_type = header.get("format", "").lower()
-                                if format_type == "image":
-                                    media_type = "image"
-                                elif format_type == "video":
-                                    media_type = "video"
-                        
-                        # Use current time as fallback for uploaded_at
-                        from datetime import datetime
-                        return TemplateDetailOut(
-                            template_name=template_name,
-                            template_type=template_type,
-                            media_type=media_type,
-                            file_url=None,  # API doesn't provide file_url in list endpoint
-                            file_hvalue=None,
-                            uploaded_at=datetime.now(),  # Use current time as fallback
-                        )
+                            # Create a TemplateDetailOut from API data
+                            # Infer template_type from category
+                            category = api_template.get("category", "text")
+                            template_type = "text" if category.lower() in ["text", "utility"] else "media"
+                            
+                            # Infer media_type from components
+                            media_type = None
+                            components = api_template.get("components", [])
+                            if components:
+                                header = next((c for c in components if c.get("type") == "HEADER"), None)
+                                if header:
+                                    format_type = header.get("format", "").lower()
+                                    if format_type == "image":
+                                        media_type = "image"
+                                    elif format_type == "video":
+                                        media_type = "video"
+                            
+                            # Use current time as fallback for uploaded_at
+                            from datetime import datetime
+                            return TemplateDetailOut(
+                                template_name=template_name,
+                                template_type=template_type,
+                                media_type=media_type,
+                                file_url=None,  # API doesn't provide file_url in list endpoint
+                                file_hvalue=None,
+                                uploaded_at=datetime.now(),  # Use current time as fallback
+                            )
         except Exception as e:
             logger.warning(f"Error fetching template from external API: {e}")
             # Continue to raise 404 below

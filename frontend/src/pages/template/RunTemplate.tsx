@@ -6,6 +6,7 @@ import {
   sendWhatsAppText,
   sendWhatsAppImage,
   sendWhatsAppVideo,
+  downloadUploadTemplate,
   type Template,
 } from "../../api/template";
 import { extractApiErrorMessage } from "../../api/errors";
@@ -23,6 +24,7 @@ export default function RunTemplate() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [phoneNumbers, setPhoneNumbers] = useState<string>("");
 
   useEffect(() => {
     loadCampaigns();
@@ -48,6 +50,22 @@ export default function RunTemplate() {
       setTemplates(approved);
     } catch (err) {
       setErrorMsg(extractApiErrorMessage(err, "Failed to fetch templates"));
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await downloadUploadTemplate();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = "campaign_upload_template.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      setErrorMsg(extractApiErrorMessage(err, "Failed to download template"));
     }
   };
 
@@ -127,15 +145,21 @@ export default function RunTemplate() {
           return;
         }
 
+        const basedOn = campaignDetails?.based_on || "Customer Base";
         const payload: any = {
           template_name: selectedTemplate,
-          basedon_value: campaignDetails?.based_on || "upload",
+          basedon_value: basedOn,
           campaign_id: campaignDetails?.id,
         };
 
         // Only include phone_numbers if based_on is "upload"
-        if (campaignDetails?.based_on === "upload") {
-          payload.phone_numbers = ""; // Will be validated on backend
+        if (basedOn === "upload") {
+          if (!phoneNumbers.trim()) {
+            setErrorMsg("Please enter phone numbers when using 'upload' mode");
+            setLoading(false);
+            return;
+          }
+          payload.phone_numbers = phoneNumbers.trim();
         }
 
         const res = await endpoint(payload);
@@ -266,6 +290,56 @@ export default function RunTemplate() {
                       ))}
                     </select>
                   </div>
+
+                  {campaignDetails?.based_on === "upload" && (
+                    <>
+                      <div className="form-field">
+                        <label>Download Template</label>
+                        <div style={{ marginBottom: "12px" }}>
+                          <button
+                            type="button"
+                            onClick={handleDownloadTemplate}
+                            style={{
+                              color: "var(--admin-link, #66b0ff)",
+                              background: "none",
+                              border: "none",
+                              textDecoration: "underline",
+                              fontWeight: 500,
+                              cursor: "pointer",
+                              padding: 0,
+                              fontFamily: "inherit",
+                              fontSize: "inherit",
+                            }}
+                          >
+                            📥 Download Excel Template
+                          </button>
+                          <small style={{ display: "block", color: "#666", fontSize: "12px", marginTop: "4px" }}>
+                            Download the template, fill in phone numbers, and upload it or enter manually below
+                          </small>
+                        </div>
+                      </div>
+                      <div className="form-field">
+                        <label htmlFor="phoneNumbers">Phone Numbers *</label>
+                        <textarea
+                          id="phoneNumbers"
+                          rows={3}
+                          placeholder="Enter comma-separated phone numbers (e.g., 919876543210, 919123456789)"
+                          value={phoneNumbers}
+                          onChange={(e) => setPhoneNumbers(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "8px",
+                            borderRadius: "4px",
+                            border: "1px solid #ddd",
+                            fontFamily: "inherit",
+                          }}
+                        />
+                        <small style={{ color: "#666", fontSize: "12px" }}>
+                          Enter phone numbers with country code (e.g., 91 for India) or use the template above
+                        </small>
+                      </div>
+                    </>
+                  )}
 
                   <div className="form-field">
                     <label>Choose Broadcasting Mode *</label>

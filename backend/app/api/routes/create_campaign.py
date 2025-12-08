@@ -2,9 +2,10 @@
 
 from datetime import datetime, date
 from typing import List, Optional
+from io import BytesIO
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import select, update, func, and_, or_, case
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +29,13 @@ from app.schemas.campaign_options import CampaignOptionsOut
 from app.schemas.campaign_count import CampaignCountRequest, CampaignCountResponse
 
 router = APIRouter(prefix="/campaign", tags=["create_campaign"])
+
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+    pd = None
 
 
 @router.get("/options", response_model=CampaignOptionsOut)
@@ -644,4 +652,46 @@ async def count_campaign_customers(
             status_code=500,
             detail=f"Error counting customers: {error_type}: {error_msg}"
         )
+
+
+@router.get("/upload/template")
+async def download_upload_template(
+    request: Request,
+    user: InvUserMaster = Depends(get_current_user),
+):
+    """Download Excel template for uploading campaign contacts."""
+    if not PANDAS_AVAILABLE:
+        raise HTTPException(
+            status_code=500,
+            detail="pandas is required for template generation. Please install it: pip install pandas"
+        )
+    
+    # Create DataFrame with template columns
+    df = pd.DataFrame(columns=["name", "mobile_no", "email_id"])
+    
+    # Create Excel file in memory
+    buffer = BytesIO()
+    df.to_excel(buffer, index=False, engine="openpyxl")
+    buffer.seek(0)
+    
+    headers = {
+        "Content-Disposition": "attachment; filename=campaign_upload_template.xlsx"
+    }
+    
+    await log_audit(
+        None,  # session not needed for file download
+        user.inv_user_code,
+        "campaign",
+        None,
+        "DOWNLOAD_TEMPLATE",
+        details={"template_type": "upload_contacts"},
+        remote_addr=(request.client.host if request.client else None),
+        independent_txn=True,
+    )
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers,
+    )
 

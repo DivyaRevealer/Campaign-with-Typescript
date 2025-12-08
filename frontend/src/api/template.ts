@@ -8,6 +8,7 @@ export interface Template {
   templateCreateStatus?: string;
   Status?: string;
   category?: string;
+  media_type?: string;
 }
 
 export interface TemplateCreateRequest {
@@ -94,5 +95,12 @@ export async function sendWhatsAppImage(payload: TemplateSendRequest): Promise<a
 
 export async function sendWhatsAppVideo(payload: TemplateSendRequest): Promise<any> {
   return http.post("/campaign/templates/sendWatsAppVideo", payload);
+}
+
+export async function downloadUploadTemplate(): Promise<Blob> {
+  const response = await http.get<Blob>("/campaign/upload/template", {
+    responseType: "blob",
+  });
+  return response.data;
 }
 

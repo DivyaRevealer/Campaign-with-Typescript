@@ -267,7 +267,7 @@ export default function CampaignDashboard() {
   };
 
   return (
-    <div className="campaign-dashboard rfm-dashboard">
+    <div className="campaign-dashboard rfm-dashboard" style={{ minHeight: "100vh", backgroundColor: "#f0f2f5", padding: "20px", color: "#1a1a1a" }}>
       <div className="dashboard-header">
         <h1>Campaign Dashboard</h1>
         <p>Customer Analytics & Insights</p>
