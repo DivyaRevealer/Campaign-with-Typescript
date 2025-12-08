@@ -28,7 +28,8 @@ async def log_audit(
         "entity": entity,
         "entity_id": entity_id,
         "action": action,
-        "details": json.dumps(details) if details is not None else None,
+         # Ensure non-JSON-serializable objects (e.g., date/datetime) don't break the request
+        "details": json.dumps(details, default=str) if details is not None else None,
         "remote_addr": remote_addr,
     }
     if independent_txn:
@@ -38,3 +39,4 @@ async def log_audit(
         return
 
     await session.execute(insert(InvAuditLog).values(**payload))
+    

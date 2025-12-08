@@ -491,12 +491,12 @@ async def update_campaign(
 def _apply_campaign_filters(query, filters: CampaignCountRequest):
     """Apply campaign filters to a CRM analysis query."""
     
-    # Geography filters
-    if filters.branch:
+    # Geography filters - check for non-empty lists
+    if filters.branch and isinstance(filters.branch, list) and len(filters.branch) > 0:
         query = query.where(InvCrmAnalysis.last_in_store_name.in_(filters.branch))
-    if filters.city:
+    if filters.city and isinstance(filters.city, list) and len(filters.city) > 0:
         query = query.where(InvCrmAnalysis.last_in_store_city.in_(filters.city))
-    if filters.state:
+    if filters.state and isinstance(filters.state, list) and len(filters.state) > 0:
         query = query.where(InvCrmAnalysis.last_in_store_state.in_(filters.state))
     
     # RFM Customized filters
@@ -545,23 +545,15 @@ def _apply_campaign_filters(query, filters: CampaignCountRequest):
                 )
             )
     
-    # RFM Score filters
-    if filters.r_score:
-        r_scores = filters.r_score if isinstance(filters.r_score, list) else []
-        if r_scores:
-            query = query.where(InvCrmAnalysis.r_score.in_(r_scores))
-    if filters.f_score:
-        f_scores = filters.f_score if isinstance(filters.f_score, list) else []
-        if f_scores:
-            query = query.where(InvCrmAnalysis.f_score.in_(f_scores))
-    if filters.m_score:
-        m_scores = filters.m_score if isinstance(filters.m_score, list) else []
-        if m_scores:
-            query = query.where(InvCrmAnalysis.m_score.in_(m_scores))
-    if filters.rfm_segments:
-        segments = filters.rfm_segments if isinstance(filters.rfm_segments, list) else []
-        if segments:
-            query = query.where(InvCrmAnalysis.segment_map.in_(segments))
+    # RFM Score filters - check for non-empty lists
+    if filters.r_score and isinstance(filters.r_score, list) and len(filters.r_score) > 0:
+        query = query.where(InvCrmAnalysis.r_score.in_(filters.r_score))
+    if filters.f_score and isinstance(filters.f_score, list) and len(filters.f_score) > 0:
+        query = query.where(InvCrmAnalysis.f_score.in_(filters.f_score))
+    if filters.m_score and isinstance(filters.m_score, list) and len(filters.m_score) > 0:
+        query = query.where(InvCrmAnalysis.m_score.in_(filters.m_score))
+    if filters.rfm_segments and isinstance(filters.rfm_segments, list) and len(filters.rfm_segments) > 0:
+        query = query.where(InvCrmAnalysis.segment_map.in_(filters.rfm_segments))
     
     # Occasion filters
     if filters.birthday_start:
@@ -588,15 +580,31 @@ async def count_campaign_customers(
     user: InvUserMaster = Depends(get_current_user),
 ) -> CampaignCountResponse:
     """Count customers matching campaign criteria."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         # Total customers
         total_query = select(func.count(InvCrmAnalysis.cust_mobileno))
-        total_count = (await session.execute(total_query)).scalar() or 0
+        total_count = (await session.execute(total_query)).scalar()
+        if total_count is None:
+            total_count = 0
         
         # Shortlisted customers (with filters applied)
-        shortlisted_query = select(func.count(InvCrmAnalysis.cust_mobileno))
-        shortlisted_query = _apply_campaign_filters(shortlisted_query, payload)
-        shortlisted_count = (await session.execute(shortlisted_query)).scalar() or 0
+        try:
+            shortlisted_query = select(func.count(InvCrmAnalysis.cust_mobileno))
+            logger.debug(f"Applying filters to query. Payload: {payload.model_dump(exclude_none=True)}")
+            shortlisted_query = _apply_campaign_filters(shortlisted_query, payload)
+            logger.debug(f"Query constructed successfully")
+            shortlisted_count = (await session.execute(shortlisted_query)).scalar()
+            if shortlisted_count is None:
+                shortlisted_count = 0
+        except Exception as filter_error:
+            logger.error(f"Error applying filters: {type(filter_error).__name__}: {str(filter_error)}")
+            logger.error(f"Filter payload: {payload.model_dump(exclude_none=True)}")
+            import traceback
+            logger.error(f"Filter error traceback: {traceback.format_exc()}")
+            raise
         
         await log_audit(
             session,
@@ -613,8 +621,18 @@ async def count_campaign_customers(
             total_customers=total_count,
             shortlisted_customers=shortlisted_count,
         )
+    except HTTPException:
+        raise
     except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
         error_msg = str(e)
+        error_type = type(e).__name__
+        logger.error(f"Error counting customers: {error_type}: {error_msg}")
+        logger.error(f"Payload: {payload.model_dump(exclude_none=True)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        
         if "doesn't exist" in error_msg.lower() or "table" in error_msg.lower():
             raise HTTPException(
                 status_code=500,
@@ -622,6 +640,6 @@ async def count_campaign_customers(
             )
         raise HTTPException(
             status_code=500,
-            detail=f"Error counting customers: {error_msg}"
+            detail=f"Error counting customers: {error_type}: {error_msg}"
         )
 
