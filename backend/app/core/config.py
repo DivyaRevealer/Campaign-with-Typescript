@@ -68,6 +68,26 @@ class Settings(BaseSettings):
     # can vary between Windows Server versions and should be configured via the
     # environment when deploying to Windows hosts.
     DEFENDER_MPCMDRUN_PATH: str = r"C:\Program Files\Windows Defender\MpCmdRun.exe"
+    
+    # WhatsApp Template API Configuration
+    # Support both WBOX_* (existing) and API_KEY/CHANNEL_NUMBER (new) variable names
+    WBOX_API_BASE: str | None = Field(default=None, description="WhatsApp API base URL")
+    WBOX_TOKEN: str | None = Field(default=None, description="WhatsApp API token/key")
+    WBOX_AUTH_HEADER: str | None = Field(default=None, description="WhatsApp API auth header name")
+    WBOX_AUTH_PREFIX: str | None = Field(default=None, description="WhatsApp API auth prefix")
+    WBOX_CHANNEL_NUMBER: str | None = Field(default=None, description="WhatsApp channel number")
+    API_KEY: str | None = Field(default=None, description="WhatsApp API key (alternative to WBOX_TOKEN)")
+    CHANNEL_NUMBER: str | None = Field(default=None, description="WhatsApp channel number (alternative to WBOX_CHANNEL_NUMBER)")
+    
+    @property
+    def template_api_key(self) -> str | None:
+        """Get API key from either WBOX_TOKEN or API_KEY."""
+        return self.WBOX_TOKEN or self.API_KEY
+    
+    @property
+    def template_channel_number(self) -> str | None:
+        """Get channel number from either WBOX_CHANNEL_NUMBER or CHANNEL_NUMBER."""
+        return self.WBOX_CHANNEL_NUMBER or self.CHANNEL_NUMBER
 
     @property
     def DATABASE_URL(self) -> str:

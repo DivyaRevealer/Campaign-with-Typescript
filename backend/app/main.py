@@ -19,6 +19,7 @@ from app.api.routes.delivery_reports import router as delivery_reports_router
 from app.api.routes.summary_reports import router as summary_reports_router
 from app.api.routes.campaign_dashboard import router as campaign_dashboard_router
 from app.api.routes.create_campaign import router as create_campaign_router
+from app.api.routes.template import router as template_router
 from app.core.config import settings
 from app.core.db import get_session
 from app.core.logging import setup_logging
@@ -91,3 +92,4 @@ app.include_router(delivery_reports_router, prefix="/api")
 app.include_router(summary_reports_router, prefix="/api")
 app.include_router(campaign_dashboard_router, prefix="/api")
 app.include_router(create_campaign_router, prefix="/api")
+app.include_router(template_router, prefix="/api")

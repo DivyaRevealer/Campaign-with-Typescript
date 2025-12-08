@@ -21,6 +21,8 @@ const SummaryReport = lazy(() => import("./reports/SummaryReport"));
 const Campaign = lazy(() => import("./campaign/Campaign"));
 const CampaignDashboard = lazy(() => import("./campaign/CampaignDashboard"));
 const CampaignForm = lazy(() => import("./campaign/CampaignForm"));
+const TemplateCreation = lazy(() => import("./template/TemplateCreation"));
+const RunTemplate = lazy(() => import("./template/RunTemplate"));
 
 function PrivateRoute() {
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -63,6 +65,8 @@ export default function App() {
               <Route path="/campaign/new" element={<CampaignForm />} />
               <Route path="/campaign/:id" element={<CampaignForm />} />
               <Route path="/campaign/dashboard" element={<CampaignDashboard />} />
+              <Route path="/template/create" element={<TemplateCreation />} />
+              <Route path="/template/run" element={<RunTemplate />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

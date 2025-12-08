@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any, Optional
 
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,13 +24,18 @@ async def log_audit(
     *,
     independent_txn: bool = False,
 ) -> None:
+    encoded_details = None
+    if details is not None:
+        safe_details = _stringify_keys(jsonable_encoder(details))
+        encoded_details = json.dumps(safe_details, default=str)
     payload = {
         "user_code": user_code,
         "entity": entity,
         "entity_id": entity_id,
         "action": action,
-         # Ensure non-JSON-serializable objects (e.g., date/datetime) don't break the request
-        "details": json.dumps(details, default=str) if details is not None else None,
+        # Ensure non-JSON-serializable objects (e.g., date/datetime or non-string keys)
+        # don't break the request
+        "details": encoded_details,
         "remote_addr": remote_addr,
     }
     if independent_txn:
@@ -39,4 +45,16 @@ async def log_audit(
         return
 
     await session.execute(insert(InvAuditLog).values(**payload))
+
+
+def _stringify_keys(value: Any) -> Any:
+    """Recursively coerce mapping keys to strings for JSON serialization."""
+
+    if isinstance(value, dict):
+        return {str(key): _stringify_keys(item) for key, item in value.items()}
+
+    if isinstance(value, (list, tuple, set)):
+        return [_stringify_keys(item) for item in value]
+
+    return value
     

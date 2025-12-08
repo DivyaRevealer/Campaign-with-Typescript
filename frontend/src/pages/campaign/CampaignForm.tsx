@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { isAxiosError } from "axios";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
   createCampaign,
   getCampaign,
@@ -124,7 +124,6 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
   const params = useParams<{ id: string }>();
   const id = idProp ?? (params.id ? parseInt(params.id, 10) : undefined);
   const isEditing = !!id;
-  const nav = useNavigate();
 
   const [form, setForm] = useState<CampaignFormState>(() => createEmptyForm());
   const [options, setOptions] = useState<CampaignOptions | null>(null);
@@ -768,14 +767,12 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
         }
       }
 
+      // Show success message and stay on the page
+      // Don't navigate away - let user see the success message
       if (onSaved) {
         onSaved();
-      } else if (!id) {
-        // Clear form after create
-        setTimeout(() => {
-          nav("/campaign");
-        }, 1500);
       }
+      // Note: Removed automatic navigation - alert stays on page
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 409 && id) {
         setErrorMsg("This campaign was updated by someone else. Please reload and try again.");
@@ -819,7 +816,26 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
       <form className="campaign-form" onSubmit={submit} style={{ maxWidth: 1360, margin: "0 auto" }}>
         {errorMsg && (
           <div className={`message-banner ${errorMsg.includes("successfully") ? "success" : "error"}`}>
-            {errorMsg}
+            <span style={{ flex: 1 }}>{errorMsg}</span>
+            <button
+              type="button"
+              onClick={() => setErrorMsg("")}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "inherit",
+                cursor: "pointer",
+                fontSize: "18px",
+                fontWeight: "bold",
+                padding: "0 8px",
+                marginLeft: "12px",
+                lineHeight: "1",
+                opacity: 0.7,
+              }}
+              aria-label="Close"
+            >
+              ×
+            </button>
           </div>
         )}
 

@@ -415,7 +415,9 @@ async def create_campaign(
             detail="Start date must be before end date",
         )
 
-    data = payload.model_dump(exclude_unset=True)
+    # Get all data including fields with default values (None) to ensure database required fields are included
+    # Using model_dump() without exclude_unset ensures all schema fields are included
+    data = payload.model_dump()
     obj = InvCreateCampaign(**data)
     session.add(obj)
 

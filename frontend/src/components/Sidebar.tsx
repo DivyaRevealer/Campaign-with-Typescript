@@ -279,6 +279,26 @@ export default function Sidebar() {
               </span>
               <span className="label">Campaign</span>
             </Link>
+            <Link
+              to="/template/create"
+              className={isActive("/template/create") ? "active" : ""}
+              title={collapsed ? "Create Template" : undefined}
+            >
+              <span className="ico" aria-hidden="true">
+                📝
+              </span>
+              <span className="label">Create Template</span>
+            </Link>
+            <Link
+              to="/template/run"
+              className={isActive("/template/run") ? "active" : ""}
+              title={collapsed ? "Run Template" : undefined}
+            >
+              <span className="ico" aria-hidden="true">
+                ▶️
+              </span>
+              <span className="label">Run Template</span>
+            </Link>
           </nav>
         </div>
       </div>
