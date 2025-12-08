@@ -316,10 +316,10 @@
 .product-filters-row {
   display: flex;
   gap: 8px;
-  align-items: flex-end;
-  overflow-x: auto;
-  white-space: nowrap;
+  align-items: flex-start;
   margin-top: 16px;
+  overflow: visible;
+  flex-wrap: wrap;
 }
 
 /* Upload Card */

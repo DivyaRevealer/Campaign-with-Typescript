@@ -1228,14 +1228,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
             {/* Product Filters - matching reference exact horizontal scroll layout */}
             <div
               className="product-filters-row"
-              style={{
-                display: "flex",
-                gap: 8,
-                alignItems: "flex-start",
-                overflowX: "auto",
-                whiteSpace: "nowrap",
-                marginTop: 16,
-              }}
+             
             >
               {/* Brand */}
               <div style={{ flex: "0 0 180px" }}>
