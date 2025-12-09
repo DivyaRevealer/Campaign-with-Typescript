@@ -7,6 +7,7 @@ import {
   updateCampaign,
   getCampaignOptions,
   countCampaignCustomers,
+  uploadCampaignContacts,
   type Campaign,
   type CampaignCreate,
   type CampaignUpdate,
@@ -14,6 +15,7 @@ import {
   type CampaignCountRequest,
 } from "../../api/campaign";
 import { extractApiErrorMessage } from "../../api/errors";
+import { downloadUploadTemplate } from "../../api/template";
 import "../common/adminTheme.css";
 import "./CampaignForm.css";
 
@@ -111,9 +113,35 @@ const stripQuotes = (v: unknown): string => {
   return String(v || "");
 };
 
-const toDateRange = (s: string | undefined, e: string | undefined): [string, string] | null => {
-  const cleanS = s ? stripQuotes(s) : "";
-  const cleanE = e ? stripQuotes(e) : "";
+const toDateRange = (s: string | Date | undefined, e: string | Date | undefined): [string, string] | null => {
+  // Handle date objects from backend
+  let cleanS = "";
+  let cleanE = "";
+  
+  if (s) {
+    if (s instanceof Date) {
+      cleanS = s.toISOString().split("T")[0]; // Convert to YYYY-MM-DD
+    } else if (typeof s === "string") {
+      cleanS = stripQuotes(s);
+      // If it's a date string, ensure it's in YYYY-MM-DD format
+      if (cleanS.includes("T")) {
+        cleanS = cleanS.split("T")[0];
+      }
+    }
+  }
+  
+  if (e) {
+    if (e instanceof Date) {
+      cleanE = e.toISOString().split("T")[0]; // Convert to YYYY-MM-DD
+    } else if (typeof e === "string") {
+      cleanE = stripQuotes(e);
+      // If it's a date string, ensure it's in YYYY-MM-DD format
+      if (cleanE.includes("T")) {
+        cleanE = cleanE.split("T")[0];
+      }
+    }
+  }
+  
   if (cleanS && cleanE) {
     return [cleanS, cleanE];
   }
@@ -133,7 +161,8 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
   const [uploadFile, setUploadFile] = useState<File | null>(null);
 
   // Watch values for dependent filtering (matching reference)
-  const watchBasedOn = form.basedOn || "Customer Base";
+  // Use form.basedOn directly since it's already typed as "Customer Base" | "upload"
+  const watchBasedOn = form.basedOn;
   const watchName = form.name || "";
   const watchBranch = form.branch || [];
   const watchCity = form.city || [];
@@ -218,6 +247,24 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
       });
   }, []);
 
+  const handleDownloadTemplate = async () => {
+    try {
+      setErrorMsg("");
+      const blob = await downloadUploadTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "campaign_upload_template.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setErrorMsg(extractApiErrorMessage(err, "Failed to download template"));
+    }
+  };
+
+
   // Load campaign for edit
   useEffect(() => {
     if (!id) return;
@@ -228,19 +275,37 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
         const birthdayRange = toDateRange(data.birthday_start, data.birthday_end);
         const anniversaryRange = toDateRange(data.anniversary_start, data.anniversary_end);
 
+        // Helper to extract string from JSON field (backend stores as JSON/dict)
+        const extractString = (v: unknown): string | undefined => {
+          if (typeof v === "string") return v;
+          if (v && typeof v === "object") {
+            // If it's a JSON object, try to extract a string value
+            // Some backends might wrap it in an object
+            const obj = v as Record<string, unknown>;
+            if (obj.value) return String(obj.value);
+            if (obj.op) return String(obj.op);
+            // If it's an object with string keys, return the first value
+            const values = Object.values(obj);
+            if (values.length > 0 && typeof values[0] === "string") {
+              return values[0];
+            }
+          }
+          return undefined;
+        };
+
         setForm({
-          name: data.name,
+          name: data.name || "",
           campaignPeriod,
           basedOn: data.based_on === "upload" ? "upload" : "Customer Base",
-          recencyOp: typeof data.recency_op === "string" ? data.recency_op : undefined,
-          recencyMin: data.recency_min,
-          recencyMax: data.recency_max,
-          frequencyOp: typeof data.frequency_op === "string" ? data.frequency_op : undefined,
-          frequencyMin: data.frequency_min,
-          frequencyMax: data.frequency_max,
-          monetaryOp: typeof data.monetary_op === "string" ? data.monetary_op : undefined,
-          monetaryMin: data.monetary_min,
-          monetaryMax: data.monetary_max,
+          recencyOp: extractString(data.recency_op) || (typeof data.recency_op === "string" ? data.recency_op : undefined),
+          recencyMin: data.recency_min ?? undefined,
+          recencyMax: data.recency_max ?? undefined,
+          frequencyOp: extractString(data.frequency_op) || (typeof data.frequency_op === "string" ? data.frequency_op : undefined),
+          frequencyMin: data.frequency_min ?? undefined,
+          frequencyMax: data.frequency_max ?? undefined,
+          monetaryOp: extractString(data.monetary_op) || (typeof data.monetary_op === "string" ? data.monetary_op : undefined),
+          monetaryMin: data.monetary_min ?? undefined,
+          monetaryMax: data.monetary_max ?? undefined,
           rScore: parseArr<number>(data.r_score),
           fScore: parseArr<number>(data.f_score),
           mScore: parseArr<number>(data.m_score),
@@ -259,7 +324,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
           product: parseArr<string>(data.product),
           model: parseArr<string>(data.model),
           item: parseArr<string>(data.item),
-          valueThreshold: data.value_threshold,
+          valueThreshold: data.value_threshold ?? undefined,
           rfmMode: {
             customized: data.rfm_mode === "customized",
             segmented: data.rfm_mode === "segmented",
@@ -744,27 +809,22 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
       const newId = id || resp?.id;
       if (form.basedOn === "upload" && uploadFile && newId) {
         try {
-          const formData = new FormData();
-          formData.append("file", uploadFile);
-          // TODO: Implement upload endpoint
-          // await api.post(`/campaign/${newId}/upload`, formData, {
-          //   headers: { 'Content-Type': 'multipart/form-data' },
-          // });
-          setErrorMsg("Campaign saved. Upload functionality to be implemented.");
+          const uploadResult = await uploadCampaignContacts(newId, uploadFile);
+          setErrorMsg(`Campaign saved successfully. ${uploadResult.count} contacts uploaded.`);
         } catch (uploadErr) {
           console.error("Upload failed:", uploadErr);
+          const uploadErrorMsg = extractApiErrorMessage(uploadErr, "Upload failed");
           if (!id) {
-            try {
-              // TODO: Implement delete endpoint
-              // await api.delete(`/campaign/${newId}`);
-              setErrorMsg("Upload failed. Please check manually.");
-            } catch (rollbackErr) {
-              setErrorMsg("Upload failed, and rollback could not be completed.");
-            }
+            // For new campaigns, we could optionally delete the campaign if upload fails
+            // But for now, just show the error - user can manually delete if needed
+            setErrorMsg(`Campaign saved, but upload failed: ${uploadErrorMsg}. You can upload the file later.`);
           } else {
-            setErrorMsg("Upload failed. Campaign not reverted since it was an update.");
+            setErrorMsg(`Campaign updated, but upload failed: ${uploadErrorMsg}. You can upload the file later.`);
           }
         }
+      } else if (form.basedOn === "upload" && !uploadFile) {
+        // Campaign saved but no file was uploaded
+        setErrorMsg("Campaign saved successfully. No file was uploaded - you can upload contacts later.");
       }
 
       // Show success message and stay on the page
@@ -923,7 +983,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   label="Branch"
                   placeholder="Select branches"
                   optionsProvider={() => geoOptions.allowedBranches}
-                  disabled={watchBasedOn === "upload"}
+                  disabled={false}
                 />
               </div>
               <div className="campaign-form-col" style={{ flex: "0 0 180px", maxWidth: "180px" }}>
@@ -932,7 +992,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   label="City"
                   placeholder="Select cities"
                   optionsProvider={() => geoOptions.allowedCities}
-                  disabled={watchBasedOn === "upload"}
+                  disabled={false}
                 />
               </div>
               <div className="campaign-form-col" style={{ flex: "0 0 180px", maxWidth: "180px" }}>
@@ -941,7 +1001,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   label="State"
                   placeholder="Select states"
                   optionsProvider={() => geoOptions.allowedStates}
-                  disabled={watchBasedOn === "upload"}
+                  disabled={false}
                 />
               </div>
             </div>
@@ -1200,7 +1260,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                     label="RFM Segments"
                     placeholder="Select RFM segments"
                     optionsProvider={() => options.rfm_segments}
-                    disabled={watchBasedOn === "upload"}
+                    disabled={false}
                   />
                 </div>
               </div>
@@ -1221,7 +1281,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                         purchaseType: { ...prev.purchaseType, anyPurchase: e.target.checked },
                       }))
                     }
-                    disabled={watchBasedOn === "upload"}
+                    disabled={false}
                   />
                 </label>
                 <label>
@@ -1235,7 +1295,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                         purchaseType: { ...prev.purchaseType, recentPurchase: e.target.checked },
                       }))
                     }
-                    disabled={watchBasedOn === "upload"}
+                    disabled={false}
                   />
                 </label>
               </div>
@@ -1253,7 +1313,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   label="Brand"
                   placeholder="Select brands"
                   optionsProvider={() => brandOptions.allowedBrands}
-                  disabled={watchBasedOn === "upload"}
+                  disabled={false}
                 />
               </div>
 
@@ -1264,7 +1324,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   label="Section"
                   placeholder="Select sections"
                   optionsProvider={() => brandOptions.allowedSections}
-                  disabled={watchBasedOn === "upload"}
+                  disabled={false}
                 />
               </div>
 
@@ -1275,7 +1335,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   label="Product"
                   placeholder="Select products"
                   optionsProvider={() => brandOptions.allowedProducts}
-                  disabled={watchBasedOn === "upload"}
+                  disabled={false}
                 />
               </div>
 
@@ -1286,7 +1346,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   label="Model"
                   placeholder="Select models"
                   optionsProvider={() => brandOptions.allowedModels}
-                  disabled={watchBasedOn === "upload"}
+                  disabled={false}
                 />
               </div>
 
@@ -1297,7 +1357,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   label="Item"
                   placeholder="Select items"
                   optionsProvider={() => brandOptions.allowedItems}
-                  disabled={watchBasedOn === "upload"}
+                  disabled={false}
                 />
               </div>
 
@@ -1314,7 +1374,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                     placeholder="e.g. ≥ 50000"
                     step="0.01"
                     min="0"
-                    disabled={watchBasedOn === "upload"}
+                    disabled={false}
                     style={{ width: "100%" }}
                   />
                 </div>
@@ -1336,7 +1396,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                           birthdayRange: [e.target.value, prev.birthdayRange?.[1] || ""],
                         }))
                       }
-                      disabled={watchBasedOn === "upload"}
+                      disabled={false}
                     />
                     <span>to</span>
                     <input
@@ -1348,7 +1408,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                           birthdayRange: [prev.birthdayRange?.[0] || "", e.target.value],
                         }))
                       }
-                      disabled={watchBasedOn === "upload"}
+                      disabled={false}
                       min={form.birthdayRange?.[0]}
                     />
                   </div>
@@ -1367,7 +1427,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                           anniversaryRange: [e.target.value, prev.anniversaryRange?.[1] || ""],
                         }))
                       }
-                      disabled={watchBasedOn === "upload"}
+                      disabled={false}
                     />
                     <span>to</span>
                     <input
@@ -1379,7 +1439,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                           anniversaryRange: [prev.anniversaryRange?.[0] || "", e.target.value],
                         }))
                       }
-                      disabled={watchBasedOn === "upload"}
+                      disabled={false}
                       min={form.anniversaryRange?.[0]}
                     />
                   </div>
@@ -1395,7 +1455,13 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
             <h3>Upload Contacts</h3>
             <div className="upload-section">
               <div>
-                <a href="/api/campaign/upload/template" target="_blank" rel="noopener noreferrer">
+              <a
+                  href="/api/campaign/upload/template"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void handleDownloadTemplate();
+                  }}
+                >
                   Download Template
                 </a>
                 {isEditing && (
@@ -1434,7 +1500,13 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
             type="button"
             className="btn-primary"
             onClick={isEditing ? handleSubmit : handleCheckAndCreate}
-            disabled={loading || !form.name || !form.campaignPeriod}
+            disabled={
+              loading ||
+              !form.name ||
+              !form.campaignPeriod ||
+              !form.campaignPeriod[0] ||
+              !form.campaignPeriod[1]
+            }
             style={{ padding: "8px 24px", fontSize: "16px" }}
           >
             {loading ? "Processing..." : isEditing ? "Update Campaign" : "Check and Create Campaign"}

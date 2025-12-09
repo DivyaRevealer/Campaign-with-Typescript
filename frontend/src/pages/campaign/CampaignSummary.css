@@ -1,0 +1,142 @@
+.campaign-summary-page {
+  padding: 20px;
+  background: var(--admin-page-bg);
+  color: var(--admin-page-text);
+  min-height: 100vh;
+}
+
+.campaign-summary-header {
+  margin-bottom: 24px;
+}
+
+.campaign-summary-header h1 {
+  margin: 0 0 8px 0;
+  color: var(--admin-page-text);
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.campaign-summary-header p {
+  margin: 0;
+  color: var(--admin-muted-text);
+  font-size: 14px;
+}
+
+.campaign-summary-card {
+  background: var(--admin-card-bg);
+  border: 1px solid var(--admin-card-border);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.loading-state,
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--admin-muted-text);
+}
+
+.empty-state p {
+  margin-bottom: 16px;
+  font-size: 16px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--admin-accent-gradient);
+  color: var(--admin-accent-text);
+}
+
+.btn-edit {
+  padding: 6px 16px;
+  background: var(--admin-accent-gradient);
+  border: 1px solid var(--admin-accent-border);
+  border-radius: 4px;
+  color: var(--admin-accent-text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-edit:hover {
+  opacity: 0.9;
+}
+
+.btn-edit:active {
+  opacity: 0.8;
+}
+
+.message-banner {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.message-banner.error {
+  background: rgba(239, 68, 68, 0.22);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+  padding: 0 8px;
+  margin-left: 12px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.close-btn:hover {
+  opacity: 1;
+}
+
+.admin-table-wrapper {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.admin-table thead {
+  background: var(--admin-table-header-bg, #f5f5f5);
+}
+
+.admin-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--admin-label-text);
+  border-bottom: 2px solid var(--admin-card-border);
+}
+
+.admin-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--admin-card-border);
+  color: var(--admin-page-text);
+}
+
+.admin-table tbody tr:hover {
+  background: var(--admin-table-hover-bg, #f9f9f9);
+}
+
+.admin-table tbody tr:last-child td {
+  border-bottom: none;
+}
+

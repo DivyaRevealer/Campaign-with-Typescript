@@ -16,6 +16,7 @@ from app.core.deps import get_current_user
 from app.models.inv_create_campaign import InvCreateCampaign
 from app.models.inv_crm_analysis import InvCrmAnalysis
 from app.models.inv_template_detail import InvTemplateDetail
+from app.models.inv_campaign_upload import InvCampaignUpload
 from app.models.inv_user import InvUserMaster
 from app.schemas.template import (
     TemplateCreateRequest,
@@ -572,9 +573,24 @@ async def send_whatsapp_text(
     campaign_id = payload.campaign_id
 
     if basedon == "upload":
+        # For upload campaigns, try to get phone_numbers from payload first (matching reference project)
         numbers_str = payload.phone_numbers or ""
+        
+        # If not in payload, try to fetch from database (campaign_uploads table) as fallback
+        if not numbers_str and campaign_id:
+            result = await session.execute(
+                select(InvCampaignUpload.mobile_no)
+                .where(InvCampaignUpload.campaign_id == campaign_id)
+            )
+            mobile_numbers = result.scalars().all()
+            if mobile_numbers:
+                numbers_str = ",".join(str(num) for num in mobile_numbers if num)
+        
         if not numbers_str:
-            raise HTTPException(status_code=400, detail="phone_numbers is required when basedon_value is 'upload'")
+            raise HTTPException(
+                status_code=400,
+                detail="phone_numbers is required when basedon_value is 'upload'"
+            )
     else:
         if not campaign_id:
             raise HTTPException(status_code=400, detail="campaign_id is required for Customer Base")
@@ -600,6 +616,10 @@ async def send_whatsapp_text(
 
     if not recipients:
         raise HTTPException(status_code=400, detail="No valid phone numbers provided")
+    
+    # Log sending attempt
+    logger.info(f"📤 Attempting to send WhatsApp messages - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
+    print(f"📤 Sending WhatsApp broadcast - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
 
     payload_data = {
         "messaging_product": "whatsapp",
@@ -612,11 +632,63 @@ async def send_whatsapp_text(
     try:
         resp = requests.post(url, json=payload_data, headers=headers, timeout=30)
         resp.raise_for_status()
-        return resp.json()
+        response_data = resp.json()
+        
+        # Log the response for debugging
+        logger.info(f"WhatsApp API response for template {template_name}: {response_data}")
+        print(f"📥 WhatsApp API response for template {template_name}: {response_data}")
+        
+        # Check if the API response indicates success
+        is_success = (
+            resp.status_code == 200 or resp.status_code == 201 or
+            response_data.get("success") is True or
+            response_data.get("status") == "success" or
+            response_data.get("status") == "sent" or
+            (isinstance(response_data, dict) and "messages" in response_data) or
+            (isinstance(response_data, dict) and "data" in response_data)
+        )
+        
+        if not is_success:
+            error_msg = response_data.get("error") or response_data.get("message") or "Unknown error from WhatsApp API"
+            logger.error(f"WhatsApp API returned non-success response: {error_msg}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"WhatsApp API error: {error_msg}"
+            )
+        
+        # Log success details
+        logger.info(f"✅ WhatsApp messages sent successfully! Template: {template_name}, Recipients: {len(cleaned_numbers)}")
+        print(f"✅ WhatsApp broadcast successful - Template: {template_name}, Recipients: {len(cleaned_numbers)}, Response: {response_data}")
+        
+        # Return a consistent success response
+        return {
+            "success": True,
+            "data": response_data,
+            "message": "Messages sent successfully",
+            "template_name": template_name,
+            "recipients_count": len(cleaned_numbers)
+        }
     except requests.HTTPError as e:
+        error_detail = "Unknown error"
+        if "resp" in locals():
+            try:
+                error_response = resp.json()
+                error_detail = error_response.get("error") or error_response.get("message") or resp.text
+            except:
+                error_detail = resp.text
+        else:
+            error_detail = str(e)
+        
+        logger.error(f"WhatsApp API HTTP error: {error_detail}")
         raise HTTPException(
             status_code=resp.status_code if "resp" in locals() else 500,
-            detail=resp.text if "resp" in locals() else str(e),
+            detail=f"WhatsApp API error: {error_detail}",
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error sending WhatsApp message: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send WhatsApp message: {str(e)}",
         )
 
 
@@ -642,6 +714,36 @@ async def send_whatsapp_image(
     basedon = payload.basedon_value or "upload"
     campaign_id = payload.campaign_id
 
+    if basedon == "upload":
+        # For upload campaigns, try to get phone_numbers from payload first (matching reference project)
+        numbers_str = payload.phone_numbers or ""
+        
+        # If not in payload, try to fetch from database (campaign_uploads table) as fallback
+        if not numbers_str and campaign_id:
+            result = await session.execute(
+                select(InvCampaignUpload.mobile_no)
+                .where(InvCampaignUpload.campaign_id == campaign_id)
+            )
+            mobile_numbers = result.scalars().all()
+            if mobile_numbers:
+                numbers_str = ",".join(str(num) for num in mobile_numbers if num)
+        
+        if not numbers_str:
+            raise HTTPException(
+                status_code=400,
+                detail="phone_numbers is required when basedon_value is 'upload'"
+            )
+    else:
+        if not campaign_id:
+            raise HTTPException(status_code=400, detail="campaign_id is required for Customer Base")
+        numbers_obj = await _get_eligible_customers(campaign_id, basedon, session)
+        numbers_str = numbers_obj.get("numbers", "")
+        if not numbers_str:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"No eligible customers found for campaign {campaign_id}. Please check campaign filters."
+            )
+
     # Get template details
     result = await session.execute(
         select(InvTemplateDetail).where(InvTemplateDetail.template_name == template_name)
@@ -654,21 +756,6 @@ async def send_whatsapp_image(
         )
 
     image_url = template.file_url
-
-    if basedon == "upload":
-        numbers_str = payload.phone_numbers or ""
-        if not numbers_str:
-            raise HTTPException(status_code=400, detail="phone_numbers is required when basedon_value is 'upload'")
-    else:
-        if not campaign_id:
-            raise HTTPException(status_code=400, detail="campaign_id is required for Customer Base")
-        numbers_obj = await _get_eligible_customers(campaign_id, basedon, session)
-        numbers_str = numbers_obj.get("numbers", "")
-        if not numbers_str:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"No eligible customers found for campaign {campaign_id}. Please check campaign filters."
-            )
 
     url = f"https://cloudapi.wbbox.in/api/v1.0/messages/send-template/{channel_number}"
 
@@ -684,6 +771,10 @@ async def send_whatsapp_image(
 
     if not recipients:
         raise HTTPException(status_code=400, detail="No valid phone numbers provided")
+    
+    # Log sending attempt
+    logger.info(f"📤 Attempting to send WhatsApp messages - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
+    print(f"📤 Sending WhatsApp broadcast - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
 
     payload_data = {
         "messaging_product": "whatsapp",
@@ -705,11 +796,63 @@ async def send_whatsapp_image(
     try:
         resp = requests.post(url, json=payload_data, headers=headers, timeout=30)
         resp.raise_for_status()
-        return resp.json()
+        response_data = resp.json()
+        
+        # Log the response for debugging
+        logger.info(f"WhatsApp API response for template {template_name}: {response_data}")
+        print(f"📥 WhatsApp API response for template {template_name}: {response_data}")
+        
+        # Check if the API response indicates success
+        is_success = (
+            resp.status_code == 200 or resp.status_code == 201 or
+            response_data.get("success") is True or
+            response_data.get("status") == "success" or
+            response_data.get("status") == "sent" or
+            (isinstance(response_data, dict) and "messages" in response_data) or
+            (isinstance(response_data, dict) and "data" in response_data)
+        )
+        
+        if not is_success:
+            error_msg = response_data.get("error") or response_data.get("message") or "Unknown error from WhatsApp API"
+            logger.error(f"WhatsApp API returned non-success response: {error_msg}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"WhatsApp API error: {error_msg}"
+            )
+        
+        # Log success details
+        logger.info(f"✅ WhatsApp messages sent successfully! Template: {template_name}, Recipients: {len(cleaned_numbers)}")
+        print(f"✅ WhatsApp broadcast successful - Template: {template_name}, Recipients: {len(cleaned_numbers)}, Response: {response_data}")
+        
+        # Return a consistent success response
+        return {
+            "success": True,
+            "data": response_data,
+            "message": "Messages sent successfully",
+            "template_name": template_name,
+            "recipients_count": len(cleaned_numbers)
+        }
     except requests.HTTPError as e:
+        error_detail = "Unknown error"
+        if "resp" in locals():
+            try:
+                error_response = resp.json()
+                error_detail = error_response.get("error") or error_response.get("message") or resp.text
+            except:
+                error_detail = resp.text
+        else:
+            error_detail = str(e)
+        
+        logger.error(f"WhatsApp API HTTP error: {error_detail}")
         raise HTTPException(
             status_code=resp.status_code if "resp" in locals() else 500,
-            detail=resp.text if "resp" in locals() else str(e),
+            detail=f"WhatsApp API error: {error_detail}",
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error sending WhatsApp message: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send WhatsApp message: {str(e)}",
         )
 
 
@@ -735,6 +878,36 @@ async def send_whatsapp_video(
     basedon = payload.basedon_value or "upload"
     campaign_id = payload.campaign_id
 
+    if basedon == "upload":
+        # For upload campaigns, try to get phone_numbers from payload first (matching reference project)
+        numbers_str = payload.phone_numbers or ""
+        
+        # If not in payload, try to fetch from database (campaign_uploads table) as fallback
+        if not numbers_str and campaign_id:
+            result = await session.execute(
+                select(InvCampaignUpload.mobile_no)
+                .where(InvCampaignUpload.campaign_id == campaign_id)
+            )
+            mobile_numbers = result.scalars().all()
+            if mobile_numbers:
+                numbers_str = ",".join(str(num) for num in mobile_numbers if num)
+        
+        if not numbers_str:
+            raise HTTPException(
+                status_code=400,
+                detail="phone_numbers is required when basedon_value is 'upload'"
+            )
+    else:
+        if not campaign_id:
+            raise HTTPException(status_code=400, detail="campaign_id is required for Customer Base")
+        numbers_obj = await _get_eligible_customers(campaign_id, basedon, session)
+        numbers_str = numbers_obj.get("numbers", "")
+        if not numbers_str:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"No eligible customers found for campaign {campaign_id}. Please check campaign filters."
+            )
+
     # Get template details
     result = await session.execute(
         select(InvTemplateDetail).where(InvTemplateDetail.template_name == template_name)
@@ -747,21 +920,6 @@ async def send_whatsapp_video(
         )
 
     video_url = template.file_url
-
-    if basedon == "upload":
-        numbers_str = payload.phone_numbers or ""
-        if not numbers_str:
-            raise HTTPException(status_code=400, detail="phone_numbers is required when basedon_value is 'upload'")
-    else:
-        if not campaign_id:
-            raise HTTPException(status_code=400, detail="campaign_id is required for Customer Base")
-        numbers_obj = await _get_eligible_customers(campaign_id, basedon, session)
-        numbers_str = numbers_obj.get("numbers", "")
-        if not numbers_str:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"No eligible customers found for campaign {campaign_id}. Please check campaign filters."
-            )
 
     url = f"https://cloudapi.wbbox.in/api/v1.0/messages/send-template/{channel_number}"
 
@@ -777,6 +935,10 @@ async def send_whatsapp_video(
 
     if not recipients:
         raise HTTPException(status_code=400, detail="No valid phone numbers provided")
+    
+    # Log sending attempt
+    logger.info(f"📤 Attempting to send WhatsApp messages - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
+    print(f"📤 Sending WhatsApp broadcast - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
 
     payload_data = {
         "messaging_product": "whatsapp",
@@ -798,10 +960,62 @@ async def send_whatsapp_video(
     try:
         resp = requests.post(url, json=payload_data, headers=headers, timeout=30)
         resp.raise_for_status()
-        return resp.json()
+        response_data = resp.json()
+        
+        # Log the response for debugging
+        logger.info(f"WhatsApp API response for template {template_name}: {response_data}")
+        print(f"📥 WhatsApp API response for template {template_name}: {response_data}")
+        
+        # Check if the API response indicates success
+        is_success = (
+            resp.status_code == 200 or resp.status_code == 201 or
+            response_data.get("success") is True or
+            response_data.get("status") == "success" or
+            response_data.get("status") == "sent" or
+            (isinstance(response_data, dict) and "messages" in response_data) or
+            (isinstance(response_data, dict) and "data" in response_data)
+        )
+        
+        if not is_success:
+            error_msg = response_data.get("error") or response_data.get("message") or "Unknown error from WhatsApp API"
+            logger.error(f"WhatsApp API returned non-success response: {error_msg}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"WhatsApp API error: {error_msg}"
+            )
+        
+        # Log success details
+        logger.info(f"✅ WhatsApp messages sent successfully! Template: {template_name}, Recipients: {len(cleaned_numbers)}")
+        print(f"✅ WhatsApp broadcast successful - Template: {template_name}, Recipients: {len(cleaned_numbers)}, Response: {response_data}")
+        
+        # Return a consistent success response
+        return {
+            "success": True,
+            "data": response_data,
+            "message": "Messages sent successfully",
+            "template_name": template_name,
+            "recipients_count": len(cleaned_numbers)
+        }
     except requests.HTTPError as e:
+        error_detail = "Unknown error"
+        if "resp" in locals():
+            try:
+                error_response = resp.json()
+                error_detail = error_response.get("error") or error_response.get("message") or resp.text
+            except:
+                error_detail = resp.text
+        else:
+            error_detail = str(e)
+        
+        logger.error(f"WhatsApp API HTTP error: {error_detail}")
         raise HTTPException(
             status_code=resp.status_code if "resp" in locals() else 500,
-            detail=resp.text if "resp" in locals() else str(e),
+            detail=f"WhatsApp API error: {error_detail}",
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error sending WhatsApp message: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send WhatsApp message: {str(e)}",
         )
 

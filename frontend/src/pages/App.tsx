@@ -21,6 +21,7 @@ const SummaryReport = lazy(() => import("./reports/SummaryReport"));
 const Campaign = lazy(() => import("./campaign/Campaign"));
 const CampaignDashboard = lazy(() => import("./campaign/CampaignDashboard"));
 const CampaignForm = lazy(() => import("./campaign/CampaignForm"));
+const CampaignSummary = lazy(() => import("./campaign/CampaignSummary"));
 const TemplateCreation = lazy(() => import("./template/TemplateCreation"));
 const RunTemplate = lazy(() => import("./template/RunTemplate"));
 
@@ -62,6 +63,7 @@ export default function App() {
               <Route path="/reports/delivery" element={<DeliveryReport />} />
               <Route path="/reports/summary" element={<SummaryReport />} />
               <Route path="/campaign" element={<Campaign />} />
+              <Route path="/campaign/summary" element={<CampaignSummary />} />
               <Route path="/campaign/new" element={<CampaignForm />} />
               <Route path="/campaign/:id" element={<CampaignForm />} />
               <Route path="/campaign/dashboard" element={<CampaignDashboard />} />

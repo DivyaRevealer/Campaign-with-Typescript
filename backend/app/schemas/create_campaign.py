@@ -3,7 +3,27 @@
 from datetime import date, datetime
 from typing import Optional, Dict, Any, List, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, field_serializer
+
+
+def _normalize_json_to_string(value: Any) -> Optional[str]:
+    """Convert JSON/dict fields to string if needed."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        # If it's a dict, try to extract the string value
+        # Common patterns: {"op": "="}, {"value": "="}, or just the first string value
+        if "op" in value:
+            return str(value["op"])
+        if "value" in value:
+            return str(value["value"])
+        # Get first string value if any
+        for v in value.values():
+            if isinstance(v, str):
+                return v
+    return None
 
 
 class CreateCampaignBase(BaseModel):
@@ -27,6 +47,12 @@ class CreateCampaignBase(BaseModel):
     monetary_op: Optional[str] = Field(None, description="Monetary operation (=, >=, <=, between)")
     monetary_min: Optional[float] = Field(None, description="Minimum monetary value")
     monetary_max: Optional[float] = Field(None, description="Maximum monetary value")
+    
+    @field_validator("recency_op", "frequency_op", "monetary_op", mode="before")
+    @classmethod
+    def normalize_operation_field(cls, v: Any) -> Optional[str]:
+        """Convert JSON/dict operation fields to string."""
+        return _normalize_json_to_string(v)
     
     r_score: Optional[Union[List[int], Dict[str, Any]]] = Field(None, description="R score filter (list of scores)")
     f_score: Optional[Union[List[int], Dict[str, Any]]] = Field(None, description="F score filter (list of scores)")

@@ -6,7 +6,6 @@ import {
   sendWhatsAppText,
   sendWhatsAppImage,
   sendWhatsAppVideo,
-  downloadUploadTemplate,
   type Template,
 } from "../../api/template";
 import { extractApiErrorMessage } from "../../api/errors";
@@ -24,7 +23,6 @@ export default function RunTemplate() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  const [phoneNumbers, setPhoneNumbers] = useState<string>("");
 
   useEffect(() => {
     loadCampaigns();
@@ -53,21 +51,6 @@ export default function RunTemplate() {
     }
   };
 
-  const handleDownloadTemplate = async () => {
-    try {
-      const blob = await downloadUploadTemplate();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = "campaign_upload_template.xlsx";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-    } catch (err) {
-      setErrorMsg(extractApiErrorMessage(err, "Failed to download template"));
-    }
-  };
 
   const handleSelect = async (campaignId: number) => {
     setSelectedCampaign(campaignId);
@@ -152,20 +135,21 @@ export default function RunTemplate() {
           campaign_id: campaignDetails?.id,
         };
 
-        // Only include phone_numbers if based_on is "upload"
-        if (basedOn === "upload") {
-          if (!phoneNumbers.trim()) {
-            setErrorMsg("Please enter phone numbers when using 'upload' mode");
-            setLoading(false);
-            return;
-          }
-          payload.phone_numbers = phoneNumbers.trim();
-        }
+        // For upload campaigns, phone numbers are already in the database from campaign creation
+        // No need to pass phone_numbers here
 
         const res = await endpoint(payload);
+        console.log("Broadcast API Response:", res.data);
         if (res.data.success) {
+          console.log("✅ Broadcast successful!", {
+            template: selectedTemplate,
+            campaign: campaignDetails?.name,
+            recipients: res.data.recipients_count || "unknown",
+            channels: channels.join(", "),
+          });
           setSuccessMsg("Broadcast is successful!");
         } else {
+          console.error("❌ Broadcast failed:", res.data);
           setErrorMsg("Broadcast Failed!");
         }
       }
@@ -237,21 +221,13 @@ export default function RunTemplate() {
             </select>
           </div>
 
-          {campaignDetails && (
+          {campaignDetails && showNext && (
             <div className="campaign-details-grid">
-              {hasValue(campaignDetails?.shortlisted_count) && (
-                <div className="detail-card">
-                  <h3>Customers Shortlisted</h3>
-                  <div className="detail-value">
-                    {Number(campaignDetails.shortlisted_count).toLocaleString("en-IN")}
-                  </div>
-                </div>
-              )}
-
+              {/* Left Card: Campaign Info */}
               {(hasValue(campaignDetails?.name) ||
                 (hasValue(campaignDetails?.start_date) && hasValue(campaignDetails?.end_date)) ||
                 hasValue(campaignDetails?.based_on)) && (
-                <div className="detail-card">
+                <div className="detail-card campaign-info-card">
                   <h3>Campaign Info</h3>
                   {hasValue(campaignDetails?.name) && (
                     <p>
@@ -272,138 +248,87 @@ export default function RunTemplate() {
                 </div>
               )}
 
-              {showNext && (
-                <div className="detail-card template-selection">
-                  <h3>Template Selection</h3>
-                  <div className="form-field">
-                    <label htmlFor="template">Template Name *</label>
-                    <select
-                      id="template"
-                      value={selectedTemplate}
-                      onChange={(e) => setSelectedTemplate(e.target.value)}
-                    >
-                      <option value="">Select an approved template</option>
-                      {templates.map((t) => (
-                        <option key={t.name} value={t.name}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+              {/* Right Card: Template and Broadcasting */}
+              <div className="detail-card template-broadcast-card">
+                <h3>Template and Broadcasting Mode</h3>
+                <div className="form-field">
+                  <label htmlFor="template">Template Name *</label>
+                  <select
+                    id="template"
+                    value={selectedTemplate}
+                    onChange={(e) => setSelectedTemplate(e.target.value)}
+                  >
+                    <option value="">Select an approved template</option>
+                    {templates.map((t) => (
+                      <option key={t.name} value={t.name}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                  {campaignDetails?.based_on === "upload" && (
-                    <>
-                      <div className="form-field">
-                        <label>Download Template</label>
-                        <div style={{ marginBottom: "12px" }}>
-                          <button
-                            type="button"
-                            onClick={handleDownloadTemplate}
-                            style={{
-                              color: "var(--admin-link, #66b0ff)",
-                              background: "none",
-                              border: "none",
-                              textDecoration: "underline",
-                              fontWeight: 500,
-                              cursor: "pointer",
-                              padding: 0,
-                              fontFamily: "inherit",
-                              fontSize: "inherit",
-                            }}
-                          >
-                            📥 Download Excel Template
-                          </button>
-                          <small style={{ display: "block", color: "#666", fontSize: "12px", marginTop: "4px" }}>
-                            Download the template, fill in phone numbers, and upload it or enter manually below
-                          </small>
-                        </div>
-                      </div>
-                      <div className="form-field">
-                        <label htmlFor="phoneNumbers">Phone Numbers *</label>
-                        <textarea
-                          id="phoneNumbers"
-                          rows={3}
-                          placeholder="Enter comma-separated phone numbers (e.g., 919876543210, 919123456789)"
-                          value={phoneNumbers}
-                          onChange={(e) => setPhoneNumbers(e.target.value)}
-                          style={{
-                            width: "100%",
-                            padding: "8px",
-                            borderRadius: "4px",
-                            border: "1px solid #ddd",
-                            fontFamily: "inherit",
-                          }}
-                        />
-                        <small style={{ color: "#666", fontSize: "12px" }}>
-                          Enter phone numbers with country code (e.g., 91 for India) or use the template above
-                        </small>
-                      </div>
-                    </>
-                  )}
-
-                  <div className="form-field">
-                    <label>Choose Broadcasting Mode *</label>
-                    <div className="checkbox-group">
-                      <label>
-                        <input
-                          type="checkbox"
-                          value="WhatsApp"
-                          checked={channels.includes("WhatsApp")}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setChannels([...channels, "WhatsApp"]);
-                            } else {
-                              setChannels(channels.filter((c) => c !== "WhatsApp"));
-                            }
-                          }}
-                        />
-                        WhatsApp
-                      </label>
-                      <label>
-                        <input
-                          type="checkbox"
-                          value="SMS"
-                          checked={channels.includes("SMS")}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setChannels([...channels, "SMS"]);
-                            } else {
-                              setChannels(channels.filter((c) => c !== "SMS"));
-                            }
-                          }}
-                        />
-                        SMS
-                      </label>
-                      <label>
-                        <input
-                          type="checkbox"
-                          value="Email"
-                          checked={channels.includes("Email")}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setChannels([...channels, "Email"]);
-                            } else {
-                              setChannels(channels.filter((c) => c !== "Email"));
-                            }
-                          }}
-                        />
-                        Email
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="form-actions">
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      onClick={startBroadcast}
-                      disabled={loading}
-                    >
-                      {loading ? "Broadcasting..." : "Start Broadcasting"}
-                    </button>
+                <div className="form-field">
+                  <label>Choose Broadcasting Mode *</label>
+                  <div className="checkbox-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        value="WhatsApp"
+                        checked={channels.includes("WhatsApp")}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setChannels([...channels, "WhatsApp"]);
+                          } else {
+                            setChannels(channels.filter((c) => c !== "WhatsApp"));
+                          }
+                        }}
+                      />
+                      WhatsApp
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        value="SMS"
+                        checked={channels.includes("SMS")}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setChannels([...channels, "SMS"]);
+                          } else {
+                            setChannels(channels.filter((c) => c !== "SMS"));
+                          }
+                        }}
+                      />
+                      SMS
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        value="Email"
+                        checked={channels.includes("Email")}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setChannels([...channels, "Email"]);
+                          } else {
+                            setChannels(channels.filter((c) => c !== "Email"));
+                          }
+                        }}
+                      />
+                      Email
+                    </label>
                   </div>
                 </div>
-              )}
+
+                <div className="form-actions">
+                  <button
+                    type="button"
+                    className="btn-primary gradient-btn"
+                    onClick={startBroadcast}
+                    disabled={loading}
+                  >
+                    {loading ? "Broadcasting..." : "Start Broadcasting"}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

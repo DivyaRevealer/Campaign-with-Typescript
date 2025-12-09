@@ -160,3 +160,101 @@ export interface CampaignCountResponse {
 
 export const countCampaignCustomers = (payload: CampaignCountRequest) =>
   http.post<CampaignCountResponse>("/campaign/run/count", payload).then((r) => r.data);
+
+export interface CampaignUploadResponse {
+  message: string;
+  count: number;
+}
+
+export const uploadCampaignContacts = (campaignId: number, file: File): Promise<CampaignUploadResponse> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return http.post<CampaignUploadResponse>(`/campaign/${campaignId}/upload`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  }).then((r) => r.data);
+};
+
+// Campaign Dashboard Types
+export interface CampaignKPIData {
+  total_customer: number;
+  unit_per_transaction: number;
+  profit_per_customer: number;
+  customer_spending: number;
+  days_to_return: number;
+  retention_rate: number;
+}
+
+export interface ChartDataPoint {
+  name: string;
+  value: number;
+  count?: number;
+}
+
+export interface SegmentDataPoint {
+  name: string;
+  value: number;
+  fill?: string;
+}
+
+export interface DaysToReturnBucketData {
+  name: string;
+  count: number;
+}
+
+export interface FiscalYearData {
+  year: string;
+  new_customer_percent: number;
+  old_customer_percent: number;
+}
+
+export interface CampaignDashboardFilters {
+  start_date?: string;
+  end_date?: string;
+  customer_mobile?: string;
+  customer_name?: string;
+  r_value_bucket?: string;
+  f_value_bucket?: string;
+  m_value_bucket?: string;
+}
+
+export interface FilterOptions {
+  customer_mobiles: string[];
+  customer_names: string[];
+  r_value_buckets: string[];
+  f_value_buckets: string[];
+  m_value_buckets: string[];
+}
+
+export interface CampaignDashboardOut {
+  kpi: CampaignKPIData;
+  r_score_data: ChartDataPoint[];
+  f_score_data: ChartDataPoint[];
+  m_score_data: ChartDataPoint[];
+  r_value_bucket_data: ChartDataPoint[];
+  visits_data: ChartDataPoint[];
+  value_data: ChartDataPoint[];
+  segment_data: SegmentDataPoint[];
+  days_to_return_bucket_data: DaysToReturnBucketData[];
+  fiscal_year_data: FiscalYearData[];
+}
+
+// Campaign Dashboard API Functions
+export const getCampaignDashboard = (filters?: CampaignDashboardFilters): Promise<CampaignDashboardOut> => {
+  const params = new URLSearchParams();
+  if (filters?.start_date) params.append("start_date", filters.start_date);
+  if (filters?.end_date) params.append("end_date", filters.end_date);
+  if (filters?.customer_mobile) params.append("customer_mobile", filters.customer_mobile);
+  if (filters?.customer_name) params.append("customer_name", filters.customer_name);
+  if (filters?.r_value_bucket) params.append("r_value_bucket", filters.r_value_bucket);
+  if (filters?.f_value_bucket) params.append("f_value_bucket", filters.f_value_bucket);
+  if (filters?.m_value_bucket) params.append("m_value_bucket", filters.m_value_bucket);
+  
+  const queryString = params.toString();
+  const url = `/campaign/dashboard${queryString ? `?${queryString}` : ""}`;
+  return http.get<CampaignDashboardOut>(url).then((r) => r.data);
+};
+
+export const getCampaignDashboardFilters = (): Promise<FilterOptions> =>
+  http.get<FilterOptions>("/campaign/dashboard/filters").then((r) => r.data);

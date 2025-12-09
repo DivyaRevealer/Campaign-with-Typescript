@@ -270,14 +270,14 @@ export default function Sidebar() {
               <span className="label">Create Campaign</span>
             </Link>
             <Link
-              to="/campaign"
-              className={isActive("/campaign") && !isActive("/campaign/dashboard") && !isActive("/campaign/new") ? "active" : ""}
-              title={collapsed ? "Campaign" : undefined}
+              to="/campaign/summary"
+              className={isActive("/campaign/summary") ? "active" : ""}
+              title={collapsed ? "Campaign Summary" : undefined}
             >
               <span className="ico" aria-hidden="true">
-                📢
+                📋
               </span>
-              <span className="label">Campaign</span>
+              <span className="label">Campaign Summary</span>
             </Link>
             <Link
               to="/template/create"

@@ -3,8 +3,9 @@
 from datetime import datetime, date
 from typing import List, Optional
 from io import BytesIO
+import math
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import select, update, func, and_, or_, case
 from sqlalchemy.exc import OperationalError
@@ -19,6 +20,7 @@ from app.core.deps import get_current_user
 from app.models.inv_create_campaign import InvCreateCampaign
 from app.models.inv_crm_analysis import InvCrmAnalysis
 from app.models.inv_campaign_brand_filter import InvCampaignBrandFilter
+from app.models.inv_campaign_upload import InvCampaignUpload
 from app.models.inv_user import InvUserMaster
 from app.schemas.create_campaign import (
     CreateCampaignCreate,
@@ -36,6 +38,9 @@ try:
 except ImportError:
     PANDAS_AVAILABLE = False
     pd = None
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 @router.get("/options", response_model=CampaignOptionsOut)
@@ -694,4 +699,106 @@ async def download_upload_template(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers=headers,
     )
+
+
+def clean_value(val):
+    """Clean value from pandas DataFrame, handling NaN."""
+    if val is None:
+        return None
+    # Handle pandas NaN
+    if isinstance(val, float) and math.isnan(val):
+        return None
+    return str(val).strip() if val else None
+
+
+@router.post("/{campaign_id}/upload")
+async def upload_campaign_contacts(
+    campaign_id: int,
+    file: UploadFile = File(...),
+    request: Request = None,
+    session: AsyncSession = Depends(get_session),
+    user: InvUserMaster = Depends(get_current_user),
+):
+    """Upload campaign contacts from Excel/CSV file."""
+    if not PANDAS_AVAILABLE:
+        raise HTTPException(
+            status_code=500,
+            detail="pandas is required for file upload. Please install it: pip install pandas"
+        )
+    
+    # Verify campaign exists
+    campaign_result = await session.execute(
+        select(InvCreateCampaign).where(InvCreateCampaign.id == campaign_id)
+    )
+    campaign = campaign_result.scalar_one_or_none()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    try:
+        # Read file into memory safely
+        contents = await file.read()
+        buffer = BytesIO(contents)
+        
+        # Decide Excel or CSV
+        if file.filename and file.filename.endswith(".csv"):
+            df = pd.read_csv(buffer)
+        else:
+            df = pd.read_excel(buffer, engine="openpyxl")
+        
+        # Normalize column names (case-insensitive, strip whitespace)
+        df.columns = [str(c).strip().lower() for c in df.columns]
+        
+        # Check required columns
+        required_cols = {"name", "mobile_no", "email_id"}
+        if not required_cols.issubset(set(df.columns)):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid template. Required columns: {required_cols}. Found: {list(df.columns)}"
+            )
+        
+        # Convert DataFrame rows to dict
+        contacts = df.to_dict(orient="records")
+        
+        # Delete existing uploads for this campaign
+        from sqlalchemy import delete
+        delete_stmt = delete(InvCampaignUpload).where(InvCampaignUpload.campaign_id == campaign_id)
+        await session.execute(delete_stmt)
+        
+        # Create new upload records
+        upload_objects = []
+        for contact in contacts:
+            mobile_no = clean_value(contact.get("mobile_no"))
+            if mobile_no:  # Only add if mobile_no exists
+                upload_objects.append(
+                    InvCampaignUpload(
+                        campaign_id=campaign_id,
+                        name=clean_value(contact.get("name")),
+                        mobile_no=str(mobile_no),
+                        email_id=clean_value(contact.get("email_id")),
+                    )
+                )
+        
+        if upload_objects:
+            session.add_all(upload_objects)
+            await session.commit()
+        
+        await log_audit(
+            session,
+            user.inv_user_code,
+            "campaign",
+            campaign_id,
+            "UPLOAD_CONTACTS",
+            details={"count": len(upload_objects), "filename": file.filename},
+            remote_addr=(request.client.host if request else None),
+            independent_txn=True,
+        )
+        
+        return {"message": "Contacts uploaded successfully", "count": len(upload_objects)}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        logger.error(f"Upload failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 

@@ -15,6 +15,7 @@ from app.models.inv_user import InvUserMaster
 from app.models.inv_crm_analysis import InvCrmAnalysis
 from app.models.inv_create_campaign import InvCreateCampaign
 from app.models.inv_campaign_brand_filter import InvCampaignBrandFilter
+from app.models.inv_campaign_upload import InvCampaignUpload
 from app.models.inv_template_detail import InvTemplateDetail
 
 __all__ = [
@@ -37,5 +38,6 @@ __all__ = [
     "InvCrmAnalysis",
     "InvCreateCampaign",
     "InvCampaignBrandFilter",
+    "InvCampaignUpload",
     "InvTemplateDetail",
 ]

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type FormEvent } from "react";
+import { useState, useEffect, useCallback, useMemo, memo, type FormEvent } from "react";
 import {
   PieChart,
   Pie,
@@ -141,14 +141,15 @@ const mockFiscalYearData: FiscalYearData[] = [
   { year: "2024", new_customer_percent: 55, old_customer_percent: 45 },
 ];
 
-const CalendarIcon = () => (
+const CalendarIcon = memo(() => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
     <line x1="16" y1="2" x2="16" y2="6" />
     <line x1="8" y1="2" x2="8" y2="6" />
     <line x1="3" y1="10" x2="21" y2="10" />
   </svg>
-);
+));
+CalendarIcon.displayName = "CalendarIcon";
 
 export default function CampaignDashboard() {
   const [filters, setFilters] = useState<DashboardFilters>({
@@ -179,6 +180,7 @@ export default function CampaignDashboard() {
   const [segmentData, setSegmentData] = useState<SegmentDataPoint[]>(mockSegmentData);
   const [daysToReturnBucketData, setDaysToReturnBucketData] = useState<DaysToReturnBucketData[]>(mockDaysToReturnBucketData);
   const [fiscalYearData, setFiscalYearData] = useState<FiscalYearData[]>(mockFiscalYearData);
+  const [chartsReady, setChartsReady] = useState(false);
 
   const handleFilterChange = (field: keyof DashboardFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -187,6 +189,7 @@ export default function CampaignDashboard() {
   const loadDashboardData = useCallback(async (filterParams?: CampaignDashboardFilters) => {
     setLoading(true);
     setError(null);
+    setChartsReady(false); // Reset charts ready state
     try {
       const response = await getCampaignDashboard(filterParams);
       setKpiData(response.kpi);
@@ -199,10 +202,17 @@ export default function CampaignDashboard() {
       setSegmentData(response.segment_data);
       setDaysToReturnBucketData(response.days_to_return_bucket_data);
       setFiscalYearData(response.fiscal_year_data);
+      
+      // Defer chart rendering to avoid blocking UI
+      // Use setTimeout to allow browser to paint KPI cards first
+      setTimeout(() => {
+        setChartsReady(true);
+      }, 100);
     } catch (err) {
       setError(extractApiErrorMessage(err));
       // Keep mock data on error for development
       console.error("Failed to load dashboard data:", err);
+      setChartsReady(true); // Show charts even on error
     } finally {
       setLoading(false);
     }
@@ -226,6 +236,15 @@ export default function CampaignDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty deps - only run on mount
 
+  // Initialize charts ready state for initial mock data
+  useEffect(() => {
+    if (!loading && !chartsReady) {
+      // Small delay to allow initial render to complete
+      const timer = setTimeout(() => setChartsReady(true), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, chartsReady]);
+
   const handleApplyFilters = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const filterParams: CampaignDashboardFilters = {};
@@ -240,34 +259,43 @@ export default function CampaignDashboard() {
     await loadDashboardData(filterParams);
   };
 
-  const formatCurrency = (value: number) => {
+  // Memoize formatters to avoid recreating on every render
+  const formatCurrency = useCallback((value: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value);
-  };
+  }, []);
 
-  const formatNumber = (value: number) => {
+  const formatNumber = useCallback((value: number) => {
     return new Intl.NumberFormat("en-IN", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value);
-  };
+  }, []);
 
-  // Convert API KPI format to display format
-  const displayKPIData = {
+  // Memoize display KPI data to avoid recalculation
+  const displayKPIData = useMemo(() => ({
     totalCustomer: kpiData.total_customer,
     unitPerTransaction: kpiData.unit_per_transaction,
     profitPerCustomer: kpiData.profit_per_customer,
     customerSpending: kpiData.customer_spending,
     daysToReturn: kpiData.days_to_return,
     retentionRate: kpiData.retention_rate,
-  };
+  }), [kpiData]);
+
+  // Memoize container styles to avoid creating new object on every render
+  const containerStyle = useMemo(() => ({
+    minHeight: "100vh",
+    backgroundColor: "#f0f2f5",
+    padding: "20px",
+    color: "#1a1a1a"
+  }), []);
 
   return (
-    <div className="campaign-dashboard rfm-dashboard" style={{ minHeight: "100vh", backgroundColor: "#f0f2f5", padding: "20px", color: "#1a1a1a" }}>
+    <div className="campaign-dashboard rfm-dashboard" style={containerStyle}>
       <div className="dashboard-header">
         <h1>Campaign Dashboard</h1>
         <p>Customer Analytics & Insights</p>
@@ -395,6 +423,17 @@ export default function CampaignDashboard() {
         </div>
       )}
 
+      {loading && (
+        <div style={{ 
+          textAlign: "center", 
+          padding: "40px", 
+          fontSize: "18px", 
+          color: "#666" 
+        }}>
+          Loading dashboard data...
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="kpi-cards metrics">
         <div className="kpi-card" style={{ borderTopColor: KPI_CARD_COLORS[0] }}>
@@ -453,216 +492,228 @@ export default function CampaignDashboard() {
         </div>
       </div>
 
-      {/* Donut Charts */}
-      <div className="charts-row charts">
-        <div className="chart-container">
-          <h4>Total Customer by R Score</h4>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={rScoreData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, count }) => `${name}: ${count}`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {rScoreData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={index === 0 ? COLORS.orange : COLORS.purple} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="chart-container">
-          <h4>Total Customer by F Score</h4>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={fScoreData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, count }) => `${name}: ${count}`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {fScoreData.map((entry, index) => {
-                  const colors = [COLORS.red, COLORS.orange, COLORS.yellow, COLORS.teal, COLORS.purple];
-                  return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
-                })}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="chart-container">
-          <h4>Total Customer by M Score</h4>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={mScoreData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, count }) => `${name}: ${count}`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {mScoreData.map((entry, index) => {
-                  const colors = [COLORS.purple, COLORS.yellow, COLORS.teal, COLORS.orange, COLORS.red];
-                  return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
-                })}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Horizontal Bar Charts */}
-      <div className="charts-row charts">
-        <div className="chart-container">
-          <h4>Total Customer by R Value Bucket (Days)</h4>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={rValueBucketData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis dataKey="name" type="category" width={100} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="value" fill={COLORS.primary} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="chart-container">
-          <h4>Total Customer by No. of Visits</h4>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={visitsData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis dataKey="name" type="category" width={100} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="value" fill={COLORS.accent} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="chart-container">
-          <h4>Total Customer by Value</h4>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={valueData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis dataKey="name" type="category" width={100} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="value" fill={COLORS.purple} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* New Charts Section - All three charts in same row */}
-      <div className="charts-row charts charts1">
-        <div className="chart-container treemap">
-          <h4>Total Customer by Segment</h4>
-          <ResponsiveContainer width="100%" height={350}>
-            <Treemap
-              width={400}
-              height={350}
-              data={segmentData}
-              dataKey="value"
-              ratio={4 / 3}
-              stroke="#fff"
-              fill="#8884d8"
-            >
-              <Tooltip 
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    const data = payload[0].payload;
-                    return (
-                      <div style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        padding: '8px 12px',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                      }}>
-                        <p style={{ margin: 0, fontWeight: 'bold', color: data.fill }}>{data.name}</p>
-                        <p style={{ margin: '4px 0 0 0' }}>Count: {data.value?.toLocaleString()}</p>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-            </Treemap>
-          </ResponsiveContainer>
-          <div className="treemap-legend" style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center' }}>
-            {segmentData.map((segment, index) => (
-              <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ width: '16px', height: '16px', backgroundColor: segment.fill || '#8884d8', borderRadius: '2px' }}></div>
-                <span style={{ fontSize: '12px' }}>{segment.name}: {segment.value.toLocaleString()}</span>
-              </div>
-            ))}
+      {/* Donut Charts - Only render when charts are ready */}
+      {chartsReady && (
+        <div className="charts-row charts">
+          <div className="chart-container">
+            <h4>Total Customer by R Score</h4>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={rScoreData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, count }) => `${name}: ${count}`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                  isAnimationActive={false}
+                >
+                  {rScoreData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={index === 0 ? COLORS.orange : COLORS.purple} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="chart-container">
+            <h4>Total Customer by F Score</h4>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={fScoreData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, count }) => `${name}: ${count}`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                  isAnimationActive={false}
+                >
+                  {fScoreData.map((entry, index) => {
+                    const colors = [COLORS.red, COLORS.orange, COLORS.yellow, COLORS.teal, COLORS.purple];
+                    return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                  })}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="chart-container">
+            <h4>Total Customer by M Score</h4>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={mScoreData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, count }) => `${name}: ${count}`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                  isAnimationActive={false}
+                >
+                  {mScoreData.map((entry, index) => {
+                    const colors = [COLORS.purple, COLORS.yellow, COLORS.teal, COLORS.orange, COLORS.red];
+                    return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                  })}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
         </div>
-        <div className="chart-container">
-          <h4>Current Vs New Customer % (FY)</h4>
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={fiscalYearData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="year" />
-              <YAxis yAxisId="left" domain={[0, 100]} label={{ value: "New Customer %", angle: -90, position: "insideLeft" }} />
-              <YAxis yAxisId="right" orientation="right" domain={[0, 100]} label={{ value: "Old Customer %", angle: 90, position: "insideRight" }} />
-              <Tooltip />
-              <Legend />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="new_customer_percent"
-                stroke="#22c55e"
-                strokeWidth={2}
-                name="New Customer %"
-                dot={{ r: 5 }}
-                activeDot={{ r: 7 }}
-              />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="old_customer_percent"
-                stroke="#1a1a1a"
-                strokeWidth={2}
-                name="Old Customer %"
-                dot={{ r: 5 }}
-                activeDot={{ r: 7 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+      )}
+
+      {/* Horizontal Bar Charts - Only render when charts are ready */}
+      {chartsReady && (
+        <div className="charts-row charts">
+          <div className="chart-container">
+            <h4>Total Customer by R Value Bucket (Days)</h4>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={rValueBucketData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" />
+                <YAxis dataKey="name" type="category" width={100} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="value" fill={COLORS.primary} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="chart-container">
+            <h4>Total Customer by No. of Visits</h4>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={visitsData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" />
+                <YAxis dataKey="name" type="category" width={100} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="value" fill={COLORS.accent} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="chart-container">
+            <h4>Total Customer by Value</h4>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={valueData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" />
+                <YAxis dataKey="name" type="category" width={100} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="value" fill={COLORS.purple} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-        <div className="chart-container">
-          <h4>Days to Return Bucket</h4>
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={daysToReturnBucketData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="count" fill={COLORS.primary} />
-            </BarChart>
-          </ResponsiveContainer>
+      )}
+
+      {/* New Charts Section - All three charts in same row - Only render when charts are ready */}
+      {chartsReady && (
+        <div className="charts-row charts charts1">
+          <div className="chart-container treemap">
+            <h4>Total Customer by Segment</h4>
+            <ResponsiveContainer width="100%" height={350}>
+              <Treemap
+                width={400}
+                height={350}
+                data={segmentData}
+                dataKey="value"
+                ratio={4 / 3}
+                stroke="#fff"
+                fill="#8884d8"
+                isAnimationActive={false}
+              >
+                <Tooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div style={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          padding: '8px 12px',
+                          border: '1px solid #ccc',
+                          borderRadius: '4px',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}>
+                          <p style={{ margin: 0, fontWeight: 'bold', color: data.fill }}>{data.name}</p>
+                          <p style={{ margin: '4px 0 0 0' }}>Count: {data.value?.toLocaleString()}</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+              </Treemap>
+            </ResponsiveContainer>
+            <div className="treemap-legend" style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center' }}>
+              {segmentData.map((segment, index) => (
+                <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '16px', height: '16px', backgroundColor: segment.fill || '#8884d8', borderRadius: '2px' }}></div>
+                  <span style={{ fontSize: '12px' }}>{segment.name}: {segment.value.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="chart-container">
+            <h4>Current Vs New Customer % (FY)</h4>
+            <ResponsiveContainer width="100%" height={350}>
+              <LineChart data={fiscalYearData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="year" />
+                <YAxis yAxisId="left" domain={[0, 100]} label={{ value: "New Customer %", angle: -90, position: "insideLeft" }} />
+                <YAxis yAxisId="right" orientation="right" domain={[0, 100]} label={{ value: "Old Customer %", angle: 90, position: "insideRight" }} />
+                <Tooltip />
+                <Legend />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="new_customer_percent"
+                  stroke="#22c55e"
+                  strokeWidth={2}
+                  name="New Customer %"
+                  dot={{ r: 5 }}
+                  activeDot={{ r: 7 }}
+                  isAnimationActive={false}
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="old_customer_percent"
+                  stroke="#1a1a1a"
+                  strokeWidth={2}
+                  name="Old Customer %"
+                  dot={{ r: 5 }}
+                  activeDot={{ r: 7 }}
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="chart-container">
+            <h4>Days to Return Bucket</h4>
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={daysToReturnBucketData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="count" fill={COLORS.primary} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

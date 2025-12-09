@@ -58,22 +58,29 @@
 
 .campaign-details-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
   margin-top: 24px;
+}
+
+@media (max-width: 768px) {
+  .campaign-details-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .detail-card {
   background: linear-gradient(135deg, #36d1dc, #5b86e5);
   color: #fff;
   border-radius: 8px;
-  padding: 16px;
-  min-height: 150px;
+  padding: 20px;
+  min-height: 200px;
 }
 
 .detail-card h3 {
-  margin: 0 0 12px 0;
-  font-size: 16px;
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
   color: #fff;
 }
 
@@ -84,42 +91,71 @@
 }
 
 .detail-card p {
-  margin: 8px 0;
+  margin: 10px 0;
   color: #fff;
   font-size: 14px;
+  line-height: 1.5;
 }
 
-.detail-card.template-selection {
-  background: var(--admin-card-bg);
-  color: var(--admin-page-text);
-  border: 1px solid var(--admin-card-border);
+.detail-card.campaign-info-card {
+  background: linear-gradient(135deg, #36d1dc, #5b86e5);
 }
 
-.detail-card.template-selection h3 {
-  color: var(--admin-page-text);
+.detail-card.template-broadcast-card {
+  background: linear-gradient(135deg, #36d1dc, #5b86e5);
 }
 
-.detail-card.template-selection p {
-  color: var(--admin-page-text);
+.detail-card.template-broadcast-card .form-field {
+  margin-bottom: 16px;
+}
+
+.detail-card.template-broadcast-card .form-field label {
+  color: #fff;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.detail-card.template-broadcast-card .form-field select {
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.detail-card.template-broadcast-card .form-field select:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.detail-card.template-broadcast-card .form-field select option {
+  background: #5b86e5;
+  color: #fff;
 }
 
 .checkbox-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
-.checkbox-group label {
+.detail-card.template-broadcast-card .checkbox-group label {
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
   font-weight: normal;
+  color: #fff;
 }
 
 .checkbox-group input[type="checkbox"] {
   width: auto;
   cursor: pointer;
+  accent-color: #fff;
 }
 
 .form-actions {
@@ -135,6 +171,15 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
+}
+
+.btn-primary.gradient-btn {
+  background: linear-gradient(135deg, #36d1dc, #5b86e5);
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  padding: 12px 24px;
+  width: 100%;
 }
 
 .btn-primary:hover:not(:disabled) {
