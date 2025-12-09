@@ -8,6 +8,7 @@ import {
   getCampaignOptions,
   countCampaignCustomers,
   uploadCampaignContacts,
+  downloadCampaignContacts,
   type Campaign,
   type CampaignCreate,
   type CampaignUpdate,
@@ -261,6 +262,17 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
       window.URL.revokeObjectURL(url);
     } catch (err) {
       setErrorMsg(extractApiErrorMessage(err, "Failed to download template"));
+    }
+  };
+
+  const handleDownloadUploadedFile = async () => {
+    if (!id) return;
+    try {
+      setErrorMsg("");
+      const campaignName = watchName || `campaign_${id}`;
+      await downloadCampaignContacts(id, campaignName);
+    } catch (err) {
+      setErrorMsg(extractApiErrorMessage(err, "Failed to download uploaded file"));
     }
   };
 
@@ -1471,9 +1483,12 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                       Do you want to download the uploaded file?
                     </span>
                     <a
-                      href={`/api/campaign/${id}/upload/download`}
-                      download={`${watchName}.xlsx`}
-                      style={{ color: "var(--admin-link)", fontWeight: 500 }}
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        void handleDownloadUploadedFile();
+                      }}
+                      style={{ color: "var(--admin-link)", fontWeight: 500, cursor: "pointer" }}
                     >
                       {watchName}.xlsx
                     </a>

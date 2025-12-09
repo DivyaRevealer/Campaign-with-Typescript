@@ -48,6 +48,24 @@ def _upload_video_to_api(api_url: str, api_key: str, contents: bytes, filename: 
     return resp.json()
 
 
+def _format_phone_numbers(mobile_numbers: list) -> str:
+    """Format phone numbers with country code prefix (91 for India)."""
+    formatted_numbers = []
+    for num in mobile_numbers:
+        if num:
+            num_str = str(num).strip()
+            # Remove any existing country code or + sign
+            num_clean = re.sub(r"^\+?91", "", num_str)
+            # Remove any non-digit characters
+            num_clean = re.sub(r"\D", "", num_clean)
+            # Add 91 prefix if number doesn't start with it and is not empty
+            if num_clean and not num_clean.startswith("91"):
+                formatted_numbers.append(f"91{num_clean}")
+            elif num_clean:
+                formatted_numbers.append(num_clean)
+    return ",".join(formatted_numbers)
+
+
 async def _save_template_details(
     session: AsyncSession,
     template_name: str,
@@ -584,13 +602,20 @@ async def send_whatsapp_text(
             )
             mobile_numbers = result.scalars().all()
             if mobile_numbers:
-                numbers_str = ",".join(str(num) for num in mobile_numbers if num)
+                logger.info(f"Found {len(mobile_numbers)} phone numbers in database for campaign {campaign_id}")
+                # Format numbers with country code prefix (91 for India)
+                numbers_str = _format_phone_numbers(mobile_numbers)
+                logger.info(f"Formatted phone numbers: {numbers_str[:100]}...")  # Log first 100 chars
+            else:
+                logger.warning(f"No phone numbers found in database for campaign {campaign_id}")
         
         if not numbers_str:
             raise HTTPException(
                 status_code=400,
                 detail="phone_numbers is required when basedon_value is 'upload'"
             )
+        else:
+            logger.info(f"Using phone numbers for upload campaign: {len(numbers_str.split(','))} numbers")
     else:
         if not campaign_id:
             raise HTTPException(status_code=400, detail="campaign_id is required for Customer Base")
@@ -726,13 +751,20 @@ async def send_whatsapp_image(
             )
             mobile_numbers = result.scalars().all()
             if mobile_numbers:
-                numbers_str = ",".join(str(num) for num in mobile_numbers if num)
+                logger.info(f"Found {len(mobile_numbers)} phone numbers in database for campaign {campaign_id}")
+                # Format numbers with country code prefix (91 for India)
+                numbers_str = _format_phone_numbers(mobile_numbers)
+                logger.info(f"Formatted phone numbers: {numbers_str[:100]}...")  # Log first 100 chars
+            else:
+                logger.warning(f"No phone numbers found in database for campaign {campaign_id}")
         
         if not numbers_str:
             raise HTTPException(
                 status_code=400,
                 detail="phone_numbers is required when basedon_value is 'upload'"
             )
+        else:
+            logger.info(f"Using phone numbers for upload campaign: {len(numbers_str.split(','))} numbers")
     else:
         if not campaign_id:
             raise HTTPException(status_code=400, detail="campaign_id is required for Customer Base")
@@ -890,13 +922,20 @@ async def send_whatsapp_video(
             )
             mobile_numbers = result.scalars().all()
             if mobile_numbers:
-                numbers_str = ",".join(str(num) for num in mobile_numbers if num)
+                logger.info(f"Found {len(mobile_numbers)} phone numbers in database for campaign {campaign_id}")
+                # Format numbers with country code prefix (91 for India)
+                numbers_str = _format_phone_numbers(mobile_numbers)
+                logger.info(f"Formatted phone numbers: {numbers_str[:100]}...")  # Log first 100 chars
+            else:
+                logger.warning(f"No phone numbers found in database for campaign {campaign_id}")
         
         if not numbers_str:
             raise HTTPException(
                 status_code=400,
                 detail="phone_numbers is required when basedon_value is 'upload'"
             )
+        else:
+            logger.info(f"Using phone numbers for upload campaign: {len(numbers_str.split(','))} numbers")
     else:
         if not campaign_id:
             raise HTTPException(status_code=400, detail="campaign_id is required for Customer Base")

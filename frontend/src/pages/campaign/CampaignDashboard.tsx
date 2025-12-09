@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo, type FormEvent } from "react";
+import { useState, useEffect, useCallback, useMemo, memo, useRef, type FormEvent } from "react";
 import {
   PieChart,
   Pie,
@@ -151,6 +151,36 @@ const CalendarIcon = memo(() => (
 ));
 CalendarIcon.displayName = "CalendarIcon";
 
+// Lazy Chart Wrapper - Only renders when visible
+const LazyChart = memo(({ children, className = "" }: { children: React.ReactNode; className?: string }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!ref.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "100px" } // Start loading 100px before visible
+    );
+
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className={className}>
+      {isVisible ? children : <div style={{ height: "300px", display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}>Loading chart...</div>}
+    </div>
+  );
+});
+LazyChart.displayName = "LazyChart";
+
 export default function CampaignDashboard() {
   const [filters, setFilters] = useState<DashboardFilters>({
     startDate: "",
@@ -169,6 +199,7 @@ export default function CampaignDashboard() {
     m_value_buckets: [],
   });
   const [loading, setLoading] = useState(false);
+  const [filtersLoading, setFiltersLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [kpiData, setKpiData] = useState<CampaignKPIData>(mockKPIData);
   const [rScoreData, setRScoreData] = useState<ChartDataPoint[]>(mockRScoreData);
@@ -187,63 +218,82 @@ export default function CampaignDashboard() {
   };
 
   const loadDashboardData = useCallback(async (filterParams?: CampaignDashboardFilters) => {
-    setLoading(true);
+    // Don't block UI - show mock data immediately, update later
     setError(null);
-    setChartsReady(false); // Reset charts ready state
-    try {
-      const response = await getCampaignDashboard(filterParams);
-      setKpiData(response.kpi);
-      setRScoreData(response.r_score_data);
-      setFScoreData(response.f_score_data);
-      setMScoreData(response.m_score_data);
-      setRValueBucketData(response.r_value_bucket_data);
-      setVisitsData(response.visits_data);
-      setValueData(response.value_data);
-      setSegmentData(response.segment_data);
-      setDaysToReturnBucketData(response.days_to_return_bucket_data);
-      setFiscalYearData(response.fiscal_year_data);
-      
-      // Defer chart rendering to avoid blocking UI
-      // Use setTimeout to allow browser to paint KPI cards first
-      setTimeout(() => {
-        setChartsReady(true);
-      }, 100);
-    } catch (err) {
-      setError(extractApiErrorMessage(err));
-      // Keep mock data on error for development
-      console.error("Failed to load dashboard data:", err);
-      setChartsReady(true); // Show charts even on error
-    } finally {
-      setLoading(false);
-    }
+    
+    // Create abort controller for cancellation
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), 30000); // 30 second timeout
+    
+    // Load data in background without blocking
+    getCampaignDashboard(filterParams)
+      .then((response) => {
+        clearTimeout(timeoutId);
+        // Update data without blocking UI
+        setKpiData(response.kpi);
+        setRScoreData(response.r_score_data);
+        setFScoreData(response.f_score_data);
+        setMScoreData(response.m_score_data);
+        setRValueBucketData(response.r_value_bucket_data);
+        setVisitsData(response.visits_data);
+        setValueData(response.value_data);
+        setSegmentData(response.segment_data);
+        setDaysToReturnBucketData(response.days_to_return_bucket_data);
+        setFiscalYearData(response.fiscal_year_data);
+      })
+      .catch((err) => {
+        clearTimeout(timeoutId);
+        const errorMsg = extractApiErrorMessage(err);
+        setError(errorMsg);
+        console.error("Failed to load dashboard data:", err);
+        // Keep mock data on error - don't block UI
+        if (errorMsg.includes("timeout") || errorMsg.includes("aborted")) {
+          console.warn("Dashboard data request timed out - using mock data");
+        }
+      });
   }, []);
 
   const loadFilterOptions = useCallback(async () => {
+    setFiltersLoading(true);
     try {
-      const options = await getCampaignDashboardFilters();
+      // Load filter options from database table via API with timeout
+      const options = await Promise.race([
+        getCampaignDashboardFilters(),
+        new Promise<FilterOptions>((_, reject) => 
+          setTimeout(() => reject(new Error("Filter options request timed out")), 10000)
+        )
+      ]);
+      console.log("Filter options loaded from database:", options);
       setFilterOptions(options);
     } catch (err) {
-      console.error("Failed to load filter options:", err);
+      console.error("Failed to load filter options from database:", err);
       // Continue with empty options - filters will just be empty
+      // Don't block the page - allow user to use dashboard without filters
+      setFilterOptions({
+        customer_mobiles: [],
+        customer_names: [],
+        r_value_buckets: [],
+        f_value_buckets: [],
+        m_value_buckets: [],
+      });
+    } finally {
+      setFiltersLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    // Load filter options first, then dashboard data
-    // Only run once on component mount
-    loadFilterOptions();
-    loadDashboardData();
+    // Show charts immediately with mock data - don't wait for API
+    // This ensures page is interactive immediately
+    setChartsReady(true);
+    
+    // Load data in background (non-blocking) - use setTimeout to defer
+    // This prevents blocking the initial render
+    setTimeout(() => {
+      loadFilterOptions();
+      loadDashboardData();
+    }, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty deps - only run on mount
-
-  // Initialize charts ready state for initial mock data
-  useEffect(() => {
-    if (!loading && !chartsReady) {
-      // Small delay to allow initial render to complete
-      const timer = setTimeout(() => setChartsReady(true), 50);
-      return () => clearTimeout(timer);
-    }
-  }, [loading, chartsReady]);
 
   const handleApplyFilters = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -332,13 +382,18 @@ export default function CampaignDashboard() {
               className="filter-select"
               value={filters.customerMobile}
               onChange={(e) => handleFilterChange("customerMobile", e.target.value)}
+              disabled={filtersLoading}
             >
               <option>All</option>
-              {filterOptions.customer_mobiles.map((mobile) => (
-                <option key={mobile} value={mobile}>
-                  {mobile}
-                </option>
-              ))}
+              {filtersLoading ? (
+                <option>Loading...</option>
+              ) : (
+                filterOptions.customer_mobiles.map((mobile) => (
+                  <option key={mobile} value={mobile}>
+                    {mobile}
+                  </option>
+                ))
+              )}
             </select>
           </div>
           <div className="filter-group filter-item">
@@ -347,13 +402,18 @@ export default function CampaignDashboard() {
               className="filter-select"
               value={filters.customerName}
               onChange={(e) => handleFilterChange("customerName", e.target.value)}
+              disabled={filtersLoading}
             >
               <option>All</option>
-              {filterOptions.customer_names.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
+              {filtersLoading ? (
+                <option>Loading...</option>
+              ) : (
+                filterOptions.customer_names.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))
+              )}
             </select>
           </div>
         </div>
@@ -364,13 +424,18 @@ export default function CampaignDashboard() {
               className="filter-select"
               value={filters.rValueBucket}
               onChange={(e) => handleFilterChange("rValueBucket", e.target.value)}
+              disabled={filtersLoading}
             >
               <option>All</option>
-              {filterOptions.r_value_buckets.map((bucket) => (
-                <option key={bucket} value={bucket}>
-                  {bucket}
-                </option>
-              ))}
+              {filtersLoading ? (
+                <option>Loading...</option>
+              ) : (
+                filterOptions.r_value_buckets.map((bucket) => (
+                  <option key={bucket} value={bucket}>
+                    {bucket}
+                  </option>
+                ))
+              )}
             </select>
           </div>
           <div className="filter-group filter-item">
@@ -379,13 +444,18 @@ export default function CampaignDashboard() {
               className="filter-select"
               value={filters.fValueBucket}
               onChange={(e) => handleFilterChange("fValueBucket", e.target.value)}
+              disabled={filtersLoading}
             >
               <option>All</option>
-              {filterOptions.f_value_buckets.map((bucket) => (
-                <option key={bucket} value={bucket}>
-                  {bucket}
-                </option>
-              ))}
+              {filtersLoading ? (
+                <option>Loading...</option>
+              ) : (
+                filterOptions.f_value_buckets.map((bucket) => (
+                  <option key={bucket} value={bucket}>
+                    {bucket}
+                  </option>
+                ))
+              )}
             </select>
           </div>
           <div className="filter-group filter-item">
@@ -394,13 +464,18 @@ export default function CampaignDashboard() {
               className="filter-select"
               value={filters.mValueBucket}
               onChange={(e) => handleFilterChange("mValueBucket", e.target.value)}
+              disabled={filtersLoading}
             >
               <option>All</option>
-              {filterOptions.m_value_buckets.map((bucket) => (
-                <option key={bucket} value={bucket}>
-                  {bucket}
-                </option>
-              ))}
+              {filtersLoading ? (
+                <option>Loading...</option>
+              ) : (
+                filterOptions.m_value_buckets.map((bucket) => (
+                  <option key={bucket} value={bucket}>
+                    {bucket}
+                  </option>
+                ))
+              )}
             </select>
           </div>
           <div className="filter-group filter-actions">
@@ -423,16 +498,6 @@ export default function CampaignDashboard() {
         </div>
       )}
 
-      {loading && (
-        <div style={{ 
-          textAlign: "center", 
-          padding: "40px", 
-          fontSize: "18px", 
-          color: "#666" 
-        }}>
-          Loading dashboard data...
-        </div>
-      )}
 
       {/* KPI Cards */}
       <div className="kpi-cards metrics">
@@ -492,226 +557,244 @@ export default function CampaignDashboard() {
         </div>
       </div>
 
-      {/* Donut Charts - Only render when charts are ready */}
+      {/* Donut Charts - Lazy loaded */}
       {chartsReady && (
         <div className="charts-row charts">
-          <div className="chart-container">
-            <h4>Total Customer by R Score</h4>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={rScoreData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, count }) => `${name}: ${count}`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                  isAnimationActive={false}
-                >
-                  {rScoreData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 0 ? COLORS.orange : COLORS.purple} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="chart-container">
-            <h4>Total Customer by F Score</h4>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={fScoreData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, count }) => `${name}: ${count}`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                  isAnimationActive={false}
-                >
-                  {fScoreData.map((entry, index) => {
-                    const colors = [COLORS.red, COLORS.orange, COLORS.yellow, COLORS.teal, COLORS.purple];
-                    return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
-                  })}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="chart-container">
-            <h4>Total Customer by M Score</h4>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={mScoreData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, count }) => `${name}: ${count}`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                  isAnimationActive={false}
-                >
-                  {mScoreData.map((entry, index) => {
-                    const colors = [COLORS.purple, COLORS.yellow, COLORS.teal, COLORS.orange, COLORS.red];
-                    return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
-                  })}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          <LazyChart>
+            <div className="chart-container">
+              <h4>Total Customer by R Score</h4>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={rScoreData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, count }) => `${name}: ${count}`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    isAnimationActive={false}
+                  >
+                    {rScoreData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === 0 ? COLORS.orange : COLORS.purple} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </LazyChart>
+          <LazyChart>
+            <div className="chart-container">
+              <h4>Total Customer by F Score</h4>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={fScoreData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, count }) => `${name}: ${count}`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    isAnimationActive={false}
+                  >
+                    {fScoreData.map((entry, index) => {
+                      const colors = [COLORS.red, COLORS.orange, COLORS.yellow, COLORS.teal, COLORS.purple];
+                      return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                    })}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </LazyChart>
+          <LazyChart>
+            <div className="chart-container">
+              <h4>Total Customer by M Score</h4>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={mScoreData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, count }) => `${name}: ${count}`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    isAnimationActive={false}
+                  >
+                    {mScoreData.map((entry, index) => {
+                      const colors = [COLORS.purple, COLORS.yellow, COLORS.teal, COLORS.orange, COLORS.red];
+                      return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                    })}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </LazyChart>
         </div>
       )}
 
-      {/* Horizontal Bar Charts - Only render when charts are ready */}
+      {/* Horizontal Bar Charts - Lazy loaded */}
       {chartsReady && (
         <div className="charts-row charts">
-          <div className="chart-container">
-            <h4>Total Customer by R Value Bucket (Days)</h4>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={rValueBucketData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={100} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="value" fill={COLORS.primary} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="chart-container">
-            <h4>Total Customer by No. of Visits</h4>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={visitsData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={100} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="value" fill={COLORS.accent} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="chart-container">
-            <h4>Total Customer by Value</h4>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={valueData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={100} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="value" fill={COLORS.purple} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <LazyChart>
+            <div className="chart-container">
+              <h4>Total Customer by R Value Bucket (Days)</h4>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={rValueBucketData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="name" type="category" width={100} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="value" fill={COLORS.primary} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </LazyChart>
+          <LazyChart>
+            <div className="chart-container">
+              <h4>Total Customer by No. of Visits</h4>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={visitsData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="name" type="category" width={100} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="value" fill={COLORS.accent} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </LazyChart>
+          <LazyChart>
+            <div className="chart-container">
+              <h4>Total Customer by Value</h4>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={valueData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="name" type="category" width={100} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="value" fill={COLORS.purple} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </LazyChart>
         </div>
       )}
 
-      {/* New Charts Section - All three charts in same row - Only render when charts are ready */}
+      {/* New Charts Section - All three charts in same row - Lazy loaded */}
       {chartsReady && (
         <div className="charts-row charts charts1">
-          <div className="chart-container treemap">
-            <h4>Total Customer by Segment</h4>
-            <ResponsiveContainer width="100%" height={350}>
-              <Treemap
-                width={400}
-                height={350}
-                data={segmentData}
-                dataKey="value"
-                ratio={4 / 3}
-                stroke="#fff"
-                fill="#8884d8"
-                isAnimationActive={false}
-              >
-                <Tooltip 
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div style={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          padding: '8px 12px',
-                          border: '1px solid #ccc',
-                          borderRadius: '4px',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                        }}>
-                          <p style={{ margin: 0, fontWeight: 'bold', color: data.fill }}>{data.name}</p>
-                          <p style={{ margin: '4px 0 0 0' }}>Count: {data.value?.toLocaleString()}</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-              </Treemap>
-            </ResponsiveContainer>
-            <div className="treemap-legend" style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center' }}>
-              {segmentData.map((segment, index) => (
-                <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <div style={{ width: '16px', height: '16px', backgroundColor: segment.fill || '#8884d8', borderRadius: '2px' }}></div>
-                  <span style={{ fontSize: '12px' }}>{segment.name}: {segment.value.toLocaleString()}</span>
-                </div>
-              ))}
+          <LazyChart>
+            <div className="chart-container treemap">
+              <h4>Total Customer by Segment</h4>
+              <ResponsiveContainer width="100%" height={350}>
+                <Treemap
+                  width={400}
+                  height={350}
+                  data={segmentData}
+                  dataKey="value"
+                  ratio={4 / 3}
+                  stroke="#fff"
+                  fill="#8884d8"
+                  isAnimationActive={false}
+                >
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div style={{
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            padding: '8px 12px',
+                            border: '1px solid #ccc',
+                            borderRadius: '4px',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }}>
+                            <p style={{ margin: 0, fontWeight: 'bold', color: data.fill }}>{data.name}</p>
+                            <p style={{ margin: '4px 0 0 0' }}>Count: {data.value?.toLocaleString()}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                </Treemap>
+              </ResponsiveContainer>
+              <div className="treemap-legend" style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center' }}>
+                {segmentData.map((segment, index) => (
+                  <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '16px', height: '16px', backgroundColor: segment.fill || '#8884d8', borderRadius: '2px' }}></div>
+                    <span style={{ fontSize: '12px' }}>{segment.name}: {segment.value.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="chart-container">
-            <h4>Current Vs New Customer % (FY)</h4>
-            <ResponsiveContainer width="100%" height={350}>
-              <LineChart data={fiscalYearData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="year" />
-                <YAxis yAxisId="left" domain={[0, 100]} label={{ value: "New Customer %", angle: -90, position: "insideLeft" }} />
-                <YAxis yAxisId="right" orientation="right" domain={[0, 100]} label={{ value: "Old Customer %", angle: 90, position: "insideRight" }} />
-                <Tooltip />
-                <Legend />
-                <Line
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey="new_customer_percent"
-                  stroke="#22c55e"
-                  strokeWidth={2}
-                  name="New Customer %"
-                  dot={{ r: 5 }}
-                  activeDot={{ r: 7 }}
-                  isAnimationActive={false}
-                />
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="old_customer_percent"
-                  stroke="#1a1a1a"
-                  strokeWidth={2}
-                  name="Old Customer %"
-                  dot={{ r: 5 }}
-                  activeDot={{ r: 7 }}
-                  isAnimationActive={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="chart-container">
-            <h4>Days to Return Bucket</h4>
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={daysToReturnBucketData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="count" fill={COLORS.primary} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          </LazyChart>
+          <LazyChart>
+            <div className="chart-container">
+              <h4>Current Vs New Customer % (FY)</h4>
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={fiscalYearData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="year" />
+                  <YAxis yAxisId="left" domain={[0, 100]} label={{ value: "New Customer %", angle: -90, position: "insideLeft" }} />
+                  <YAxis yAxisId="right" orientation="right" domain={[0, 100]} label={{ value: "Old Customer %", angle: 90, position: "insideRight" }} />
+                  <Tooltip />
+                  <Legend />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="new_customer_percent"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    name="New Customer %"
+                    dot={{ r: 5 }}
+                    activeDot={{ r: 7 }}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="old_customer_percent"
+                    stroke="#1a1a1a"
+                    strokeWidth={2}
+                    name="Old Customer %"
+                    dot={{ r: 5 }}
+                    activeDot={{ r: 7 }}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </LazyChart>
+          <LazyChart>
+            <div className="chart-container">
+              <h4>Days to Return Bucket</h4>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={daysToReturnBucketData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="count" fill={COLORS.primary} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </LazyChart>
         </div>
       )}
     </div>

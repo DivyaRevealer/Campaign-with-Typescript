@@ -443,19 +443,29 @@ async def get_campaign_dashboard_filters(
     Returns distinct values for customer mobiles, names, and RFM buckets.
     """
     try:
-        # Get distinct customer mobile numbers
+        # Get distinct customer mobile numbers - ordered for consistency
+        # Filter out None, empty strings, and whitespace-only values
         mobile_query = select(InvCrmAnalysis.cust_mobileno).distinct().where(
-            InvCrmAnalysis.cust_mobileno.isnot(None)
-        )
+            and_(
+                InvCrmAnalysis.cust_mobileno.isnot(None),
+                InvCrmAnalysis.cust_mobileno != "",
+                InvCrmAnalysis.cust_mobileno != " "
+            )
+        ).order_by(InvCrmAnalysis.cust_mobileno)
         mobile_results = (await session.execute(mobile_query)).scalars().all()
-        customer_mobiles = sorted([str(m) for m in mobile_results if m])
+        customer_mobiles = [str(m).strip() for m in mobile_results if m and str(m).strip()]
         
-        # Get distinct customer names
+        # Get distinct customer names - ordered for consistency
+        # Filter out None, empty strings, and whitespace-only values
         name_query = select(InvCrmAnalysis.customer_name).distinct().where(
-            InvCrmAnalysis.customer_name.isnot(None)
-        )
+            and_(
+                InvCrmAnalysis.customer_name.isnot(None),
+                InvCrmAnalysis.customer_name != "",
+                InvCrmAnalysis.customer_name != " "
+            )
+        ).order_by(InvCrmAnalysis.customer_name)
         name_results = (await session.execute(name_query)).scalars().all()
-        customer_names = sorted([str(n) for n in name_results if n])
+        customer_names = [str(n).strip() for n in name_results if n and str(n).strip()]
         
         # Get distinct R value buckets (based on DAYS field)
         r_bucket_query = select(

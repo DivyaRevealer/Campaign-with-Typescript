@@ -798,7 +798,91 @@ async def upload_campaign_contacts(
     except HTTPException:
         raise
     except Exception as e:
-        await session.rollback()
-        logger.error(f"Upload failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        error_msg = str(e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error uploading contacts: {error_msg}"
+        )
+
+
+@router.get("/{campaign_id}/upload/download")
+async def download_campaign_contacts(
+    campaign_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: InvUserMaster = Depends(get_current_user),
+):
+    """Download campaign contacts as Excel file from database."""
+    if not PANDAS_AVAILABLE:
+        raise HTTPException(
+            status_code=500,
+            detail="pandas is required for file download. Please install it: pip install pandas"
+        )
+    
+    try:
+        # Verify campaign exists
+        campaign_result = await session.execute(
+            select(InvCreateCampaign).where(InvCreateCampaign.id == campaign_id)
+        )
+        campaign = campaign_result.scalar_one_or_none()
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        
+        # Fetch all uploaded contacts for this campaign
+        upload_result = await session.execute(
+            select(InvCampaignUpload).where(InvCampaignUpload.campaign_id == campaign_id)
+        )
+        upload_records = upload_result.scalars().all()
+        
+        if not upload_records:
+            raise HTTPException(
+                status_code=404,
+                detail="No contacts found for this campaign. Please upload contacts first."
+            )
+        
+        # Convert to DataFrame
+        data = []
+        for record in upload_records:
+            data.append({
+                "name": record.name or "",
+                "mobile_no": record.mobile_no or "",
+                "email_id": record.email_id or "",
+            })
+        
+        df = pd.DataFrame(data)
+        
+        # Create Excel file in memory
+        buffer = BytesIO()
+        df.to_excel(buffer, index=False, engine="openpyxl")
+        buffer.seek(0)
+        
+        # Generate filename from campaign name
+        safe_campaign_name = "".join(c for c in campaign.name if c.isalnum() or c in (' ', '-', '_')).strip()
+        filename = f"{safe_campaign_name}.xlsx" if safe_campaign_name else f"campaign_{campaign_id}_contacts.xlsx"
+        
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+        
+        await log_audit(
+            session,
+            user.inv_user_code,
+            "campaign",
+            campaign_id,
+            "DOWNLOAD_CONTACTS",
+            details={"count": len(upload_records), "filename": filename},
+            remote_addr=(request.client.host if request.client else None),
+            independent_txn=True,
+        )
+        
+        return StreamingResponse(
+            buffer,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers=headers,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Download failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to download contacts: {str(e)}")
 

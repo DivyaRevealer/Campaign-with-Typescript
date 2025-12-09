@@ -176,6 +176,44 @@ export const uploadCampaignContacts = (campaignId: number, file: File): Promise<
   }).then((r) => r.data);
 };
 
+export const downloadCampaignContacts = async (campaignId: number, campaignName: string): Promise<void> => {
+  try {
+    const response = await http.get(`/campaign/${campaignId}/upload/download`, {
+      responseType: "blob",
+    });
+    
+    // Create blob URL and trigger download
+    const blob = response.data instanceof Blob 
+      ? response.data 
+      : new Blob([response.data], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    
+    // Generate safe filename from campaign name
+    const safeName = campaignName.replace(/[^a-zA-Z0-9-_ ]/g, "").trim() || `campaign_${campaignId}`;
+    link.download = `${safeName}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (error: any) {
+    // If it's a blob error (404, etc.), try to read the error message
+    if (error.response && error.response.data instanceof Blob) {
+      const text = await error.response.data.text();
+      try {
+        const errorData = JSON.parse(text);
+        throw new Error(errorData.detail || errorData.message || "Failed to download file");
+      } catch {
+        throw new Error("Failed to download file. Please ensure contacts are uploaded for this campaign.");
+      }
+    }
+    throw error;
+  }
+};
+
 // Campaign Dashboard Types
 export interface CampaignKPIData {
   total_customer: number;
@@ -253,8 +291,11 @@ export const getCampaignDashboard = (filters?: CampaignDashboardFilters): Promis
   
   const queryString = params.toString();
   const url = `/campaign/dashboard${queryString ? `?${queryString}` : ""}`;
-  return http.get<CampaignDashboardOut>(url).then((r) => r.data);
+  // Add timeout of 30 seconds for dashboard data
+  return http.get<CampaignDashboardOut>(url, { timeout: 30000 }).then((r) => r.data);
 };
 
-export const getCampaignDashboardFilters = (): Promise<FilterOptions> =>
-  http.get<FilterOptions>("/campaign/dashboard/filters").then((r) => r.data);
+export const getCampaignDashboardFilters = (): Promise<FilterOptions> => {
+  // Add timeout of 10 seconds for filter options (should be fast)
+  return http.get<FilterOptions>("/campaign/dashboard/filters", { timeout: 10000 }).then((r) => r.data);
+};
