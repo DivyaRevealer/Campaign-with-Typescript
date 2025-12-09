@@ -112,14 +112,31 @@ export default function RunTemplate() {
         }
         const templateType = templateData.template_type;
         const mediaType = templateData.media_type;
+        const templateName = selectedTemplate.toLowerCase();
+
+        console.log("Template details:", { templateType, mediaType, templateName, templateData });
 
         let endpoint = sendWhatsAppText;
-        if (templateType === "media") {
-          if (mediaType === "image") {
-            endpoint = sendWhatsAppImage;
-          } else if (mediaType === "video") {
-            endpoint = sendWhatsAppVideo;
-          }
+        // Check if it's a media template - check both template_type and media_type
+        // Also check template name as fallback
+        const isImageTemplate = 
+          mediaType === "image" || 
+          templateType === "image" ||
+          templateName.includes("image");
+        
+        const isVideoTemplate = 
+          mediaType === "video" || 
+          templateType === "video" ||
+          templateName.includes("video");
+
+        if (isImageTemplate) {
+          endpoint = sendWhatsAppImage;
+          console.log("✅ Using sendWhatsAppImage endpoint");
+        } else if (isVideoTemplate) {
+          endpoint = sendWhatsAppVideo;
+          console.log("✅ Using sendWhatsAppVideo endpoint");
+        } else {
+          console.log("Using sendWhatsAppText endpoint (default)");
         }
 
         if (!selectedTemplate) {

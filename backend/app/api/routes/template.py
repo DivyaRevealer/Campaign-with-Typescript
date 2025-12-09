@@ -627,6 +627,24 @@ async def send_whatsapp_text(
                 detail=f"No eligible customers found for campaign {campaign_id}. Please check campaign filters."
             )
 
+    # Check template type from database (matching old project behavior)
+    template_detail_result = await session.execute(
+        select(InvTemplateDetail).where(InvTemplateDetail.template_name == template_name)
+    )
+    template_detail = template_detail_result.scalar_one_or_none()
+    
+    # Determine if this is a media template and what type
+    is_media_template = False
+    media_type = None
+    media_url = None
+    
+    if template_detail:
+        if template_detail.template_type == "media" or template_detail.media_type:
+            is_media_template = True
+            media_type = template_detail.media_type
+            media_url = template_detail.file_url
+            logger.info(f"Detected media template: {template_name}, type: {media_type}, url: {media_url}")
+    
     url = f"https://cloudapi.wbbox.in/api/v1.0/messages/send-template/{channel_number}"
 
     headers = {
@@ -636,22 +654,44 @@ async def send_whatsapp_text(
     }
 
     # Clean and join the numbers into a single comma-separated string
-    cleaned_numbers = [re.sub(r"\D", "", n) for n in numbers_str.split(",")]
+    # Preserve country code (already formatted)
+    cleaned_numbers = [n.strip() for n in numbers_str.split(",") if n.strip()]
     recipients = ",".join(filter(None, cleaned_numbers))
 
     if not recipients:
         raise HTTPException(status_code=400, detail="No valid phone numbers provided")
     
     # Log sending attempt
-    logger.info(f"📤 Attempting to send WhatsApp messages - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
+    logger.info(f"📤 Attempting to send WhatsApp messages - Template: {template_name}, Recipients: {len(cleaned_numbers)}, Media: {is_media_template}")
     print(f"📤 Sending WhatsApp broadcast - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
+
+    # Build template payload - add media components if it's a media template (matching old project)
+    template_payload = {
+        "name": template_name,
+        "language": {"code": "en"},
+    }
+    
+    components = []
+    if is_media_template and media_url:
+        if media_type == "image":
+            components.append({
+                "type": "header",
+                "parameters": [{"type": "image", "image": {"link": media_url}}],
+            })
+        elif media_type == "video":
+            components.append({
+                "type": "header",
+                "parameters": [{"type": "video", "video": {"link": media_url}}],
+            })
+    
+    if components:
+        template_payload["components"] = components
 
     payload_data = {
         "messaging_product": "whatsapp",
         "to": recipients,
         "type": "template",
-        "template": {"name": template_name, "language": {"code": "en"}},
-        "components": [],
+        "template": template_payload,
     }
 
     try:
@@ -797,17 +837,19 @@ async def send_whatsapp_image(
         "Content-Type": "application/json",
     }
 
-    # Clean and join the numbers into a single comma-separated string
-    cleaned_numbers = [re.sub(r"\D", "", n) for n in numbers_str.split(",")]
+    # Clean and join the numbers into a single comma-separated string (matching old project)
+    # Preserve country code (already formatted)
+    cleaned_numbers = [n.strip() for n in numbers_str.split(",") if n.strip()]
     recipients = ",".join(filter(None, cleaned_numbers))
 
     if not recipients:
         raise HTTPException(status_code=400, detail="No valid phone numbers provided")
     
     # Log sending attempt
-    logger.info(f"📤 Attempting to send WhatsApp messages - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
-    print(f"📤 Sending WhatsApp broadcast - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
+    logger.info(f"📤 Attempting to send WhatsApp image messages - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
+    print(f"📤 Sending WhatsApp image broadcast - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
 
+    # Send in bulk with comma-separated recipients (matching old project approach)
     payload_data = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
@@ -853,8 +895,8 @@ async def send_whatsapp_image(
             )
         
         # Log success details
-        logger.info(f"✅ WhatsApp messages sent successfully! Template: {template_name}, Recipients: {len(cleaned_numbers)}")
-        print(f"✅ WhatsApp broadcast successful - Template: {template_name}, Recipients: {len(cleaned_numbers)}, Response: {response_data}")
+        logger.info(f"✅ WhatsApp image messages sent successfully! Template: {template_name}, Recipients: {len(cleaned_numbers)}")
+        print(f"✅ WhatsApp image broadcast successful - Template: {template_name}, Recipients: {len(cleaned_numbers)}, Response: {response_data}")
         
         # Return a consistent success response
         return {
@@ -968,93 +1010,85 @@ async def send_whatsapp_video(
         "Content-Type": "application/json",
     }
 
-    # Clean and join the numbers into a single comma-separated string
-    cleaned_numbers = [re.sub(r"\D", "", n) for n in numbers_str.split(",")]
-    recipients = ",".join(filter(None, cleaned_numbers))
+    # Clean phone numbers - preserve country code (already formatted)
+    cleaned_numbers = [n.strip() for n in numbers_str.split(",") if n.strip()]
 
-    if not recipients:
+    if not cleaned_numbers:
         raise HTTPException(status_code=400, detail="No valid phone numbers provided")
     
     # Log sending attempt
-    logger.info(f"📤 Attempting to send WhatsApp messages - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
-    print(f"📤 Sending WhatsApp broadcast - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
+    logger.info(f"📤 Attempting to send WhatsApp video messages - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
+    print(f"📤 Sending WhatsApp video broadcast - Template: {template_name}, Recipients: {len(cleaned_numbers)}")
 
-    payload_data = {
-        "messaging_product": "whatsapp",
-        "recipient_type": "individual",
-        "to": recipients,
-        "type": "template",
-        "template": {
-            "name": template_name,
-            "language": {"code": "en"},
-            "components": [
-                {
-                    "type": "header",
-                    "parameters": [{"type": "video", "video": {"link": video_url}}],
-                }
-            ],
-        },
-    }
-
-    try:
-        resp = requests.post(url, json=payload_data, headers=headers, timeout=30)
-        resp.raise_for_status()
-        response_data = resp.json()
-        
-        # Log the response for debugging
-        logger.info(f"WhatsApp API response for template {template_name}: {response_data}")
-        print(f"📥 WhatsApp API response for template {template_name}: {response_data}")
-        
-        # Check if the API response indicates success
-        is_success = (
-            resp.status_code == 200 or resp.status_code == 201 or
-            response_data.get("success") is True or
-            response_data.get("status") == "success" or
-            response_data.get("status") == "sent" or
-            (isinstance(response_data, dict) and "messages" in response_data) or
-            (isinstance(response_data, dict) and "data" in response_data)
-        )
-        
-        if not is_success:
-            error_msg = response_data.get("error") or response_data.get("message") or "Unknown error from WhatsApp API"
-            logger.error(f"WhatsApp API returned non-success response: {error_msg}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"WhatsApp API error: {error_msg}"
-            )
-        
-        # Log success details
-        logger.info(f"✅ WhatsApp messages sent successfully! Template: {template_name}, Recipients: {len(cleaned_numbers)}")
-        print(f"✅ WhatsApp broadcast successful - Template: {template_name}, Recipients: {len(cleaned_numbers)}, Response: {response_data}")
-        
-        # Return a consistent success response
-        return {
-            "success": True,
-            "data": response_data,
-            "message": "Messages sent successfully",
-            "template_name": template_name,
-            "recipients_count": len(cleaned_numbers)
+    # For video templates, send individually as WhatsApp API may require it for reliable delivery
+    successful_sends = 0
+    failed_sends = 0
+    errors = []
+    
+    for recipient in cleaned_numbers:
+        payload_data = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": recipient,
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {"code": "en"},
+                "components": [
+                    {
+                        "type": "header",
+                        "parameters": [{"type": "video", "video": {"link": video_url}}],
+                    }
+                ],
+            },
         }
-    except requests.HTTPError as e:
-        error_detail = "Unknown error"
-        if "resp" in locals():
-            try:
-                error_response = resp.json()
-                error_detail = error_response.get("error") or error_response.get("message") or resp.text
-            except:
-                error_detail = resp.text
-        else:
-            error_detail = str(e)
-        
-        logger.error(f"WhatsApp API HTTP error: {error_detail}")
-        raise HTTPException(
-            status_code=resp.status_code if "resp" in locals() else 500,
-            detail=f"WhatsApp API error: {error_detail}",
-        )
-    except Exception as e:
-        logger.error(f"Unexpected error sending WhatsApp message: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to send WhatsApp message: {str(e)}",
-        )
 
+        try:
+            resp = requests.post(url, json=payload_data, headers=headers, timeout=30)
+            resp.raise_for_status()
+            response_data = resp.json()
+            
+            # Check if the API response indicates success
+            is_success = (
+                resp.status_code == 200 or resp.status_code == 201 or
+                response_data.get("success") is True or
+                response_data.get("status") == "success" or
+                response_data.get("status") == "sent" or
+                (isinstance(response_data, dict) and "messages" in response_data) or
+                (isinstance(response_data, dict) and "data" in response_data)
+            )
+            
+            if is_success:
+                successful_sends += 1
+                logger.debug(f"✅ Successfully sent video to {recipient}")
+            else:
+                failed_sends += 1
+                error_msg = response_data.get("error") or response_data.get("message") or "Unknown error"
+                errors.append(f"Recipient {recipient}: {error_msg}")
+                logger.warning(f"Failed to send video to {recipient}: {error_msg}")
+        except Exception as e:
+            failed_sends += 1
+            error_msg = str(e)
+            errors.append(f"Recipient {recipient}: {error_msg}")
+            logger.error(f"Error sending video to {recipient}: {error_msg}")
+    
+    # Log results
+    logger.info(f"✅ WhatsApp video broadcast completed - Template: {template_name}, Successful: {successful_sends}, Failed: {failed_sends}")
+    print(f"✅ WhatsApp video broadcast completed - Template: {template_name}, Successful: {successful_sends}, Failed: {failed_sends}")
+    
+    if successful_sends == 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to send any video messages. Errors: {', '.join(errors[:5])}"
+        )
+    
+    # Return success response even if some failed
+    return {
+        "success": True,
+        "message": f"Video messages sent: {successful_sends} successful, {failed_sends} failed",
+        "template_name": template_name,
+        "recipients_count": len(cleaned_numbers),
+        "successful_sends": successful_sends,
+        "failed_sends": failed_sends,
+        "errors": errors[:10] if errors else []
+    }
