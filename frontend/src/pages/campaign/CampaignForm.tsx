@@ -911,75 +911,78 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
           </div>
         )}
 
-        {/* First Row: Name, Period, Based On - matching reference exact layout */}
-        <div className="campaign-form-row" style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          <div className="campaign-form-col" style={{ flex: "0 0 180px" }}>
-            <div className="form-field" style={{ marginBottom: 0 }}>
-              <label>Name</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                required
-                placeholder="Enter campaign name"
-              />
-            </div>
-          </div>
-          <div className="campaign-form-col" style={{ flex: "0 0 500px" }}>
-            <div className="form-field" style={{ marginBottom: 0 }}>
-              <label>Period</label>
-              <div className="date-range-picker">
+        {/* Basic Information Section */}
+        <div className="form-section-card">
+          <h3 className="form-section-title">Basic Information</h3>
+          <div className="campaign-form-row" style={{ display: "flex", gap: 12, marginBottom: 0 }}>
+            <div className="campaign-form-col" style={{ flex: "0 0 180px" }}>
+              <div className="form-field" style={{ marginBottom: 0 }}>
+                <label>Name</label>
                 <input
-                  type="date"
-                  value={form.campaignPeriod?.[0] || ""}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      campaignPeriod: [e.target.value, prev.campaignPeriod?.[1] || ""],
-                    }))
-                  }
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                   required
-                />
-                <span>to</span>
-                <input
-                  type="date"
-                  value={form.campaignPeriod?.[1] || ""}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      campaignPeriod: [prev.campaignPeriod?.[0] || "", e.target.value],
-                    }))
-                  }
-                  required
-                  min={form.campaignPeriod?.[0]}
+                  placeholder="Enter campaign name"
                 />
               </div>
             </div>
-          </div>
-          <div className="campaign-form-col" style={{ flex: 1 }}>
-            <div className="form-field" style={{ marginBottom: 0 }}>
-              <label>Campaign Based On</label>
-              <div className="radio-group-inline">
-                <label>
+            <div className="campaign-form-col" style={{ flex: "0 0 500px" }}>
+              <div className="form-field" style={{ marginBottom: 0 }}>
+                <label>Period</label>
+                <div className="date-range-picker">
                   <input
-                    type="radio"
-                    name="basedOn"
-                    value="Customer Base"
-                    checked={form.basedOn === "Customer Base"}
-                    onChange={(e) => setForm((prev) => ({ ...prev, basedOn: e.target.value as "Customer Base" | "upload" }))}
+                    type="date"
+                    value={form.campaignPeriod?.[0] || ""}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        campaignPeriod: [e.target.value, prev.campaignPeriod?.[1] || ""],
+                      }))
+                    }
+                    required
                   />
-                  <span>Customer Base</span>
-                </label>
-                <label>
+                  <span>to</span>
                   <input
-                    type="radio"
-                    name="basedOn"
-                    value="upload"
-                    checked={form.basedOn === "upload"}
-                    onChange={(e) => setForm((prev) => ({ ...prev, basedOn: e.target.value as "Customer Base" | "upload" }))}
+                    type="date"
+                    value={form.campaignPeriod?.[1] || ""}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        campaignPeriod: [prev.campaignPeriod?.[0] || "", e.target.value],
+                      }))
+                    }
+                    required
+                    min={form.campaignPeriod?.[0]}
                   />
-                  <span>Upload</span>
-                </label>
+                </div>
+              </div>
+            </div>
+            <div className="campaign-form-col" style={{ flex: 1 }}>
+              <div className="form-field" style={{ marginBottom: 0 }}>
+                <label>Campaign Based On</label>
+                <div className="radio-group-inline">
+                  <label>
+                    <input
+                      type="radio"
+                      name="basedOn"
+                      value="Customer Base"
+                      checked={form.basedOn === "Customer Base"}
+                      onChange={(e) => setForm((prev) => ({ ...prev, basedOn: e.target.value as "Customer Base" | "upload" }))}
+                    />
+                    <span>Customer Base</span>
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="basedOn"
+                      value="upload"
+                      checked={form.basedOn === "upload"}
+                      onChange={(e) => setForm((prev) => ({ ...prev, basedOn: e.target.value as "Customer Base" | "upload" }))}
+                    />
+                    <span>Upload</span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -987,8 +990,10 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
 
         {watchBasedOn === "Customer Base" && optionsLoaded && (
           <>
-            {/* Geography - matching reference exact layout */}
-            <div className="campaign-form-row" style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+            {/* Geography Section */}
+            <div className="form-section-card">
+              <h3 className="form-section-title">Geography</h3>
+              <div className="campaign-form-row" style={{ display: "flex", gap: 12, marginBottom: 0 }}>
               <div className="campaign-form-col" style={{ flex: "0 0 180px" }}>
                 <MultiSelectDropdown
                   name="branch"
@@ -998,7 +1003,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   disabled={false}
                 />
               </div>
-              <div className="campaign-form-col" style={{ flex: "0 0 180px", maxWidth: "180px" }}>
+              <div className="campaign-form-col" style={{ flex: "0 0 180px" }}>
                 <MultiSelectDropdown
                   name="city"
                   label="City"
@@ -1007,7 +1012,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   disabled={false}
                 />
               </div>
-              <div className="campaign-form-col" style={{ flex: "0 0 180px", maxWidth: "180px" }}>
+              <div className="campaign-form-col" style={{ flex: "0 0 180px" }}>
                 <MultiSelectDropdown
                   name="state"
                   label="State"
@@ -1017,55 +1022,50 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                 />
               </div>
             </div>
+            </div>
 
-            {/* RFM Mode - matching reference exact layout */}
-            <div className="campaign-form-row" style={{ display: "flex", gap: 16, marginTop: 8, marginBottom: 16 }}>
-              <div className="form-field">
-                <div className="switch-group">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={isCustomized}
-                      onChange={(e) => {
-                        setForm((prev) => ({
-                          ...prev,
-                          rfmMode: { customized: e.target.checked, segmented: !e.target.checked },
-                        }));
-                      }}
-                    />
-                    <span className="switch-label">RFM Customized</span>
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={isSegmented}
-                      onChange={(e) => {
-                        setForm((prev) => ({
-                          ...prev,
-                          rfmMode: { customized: !e.target.checked, segmented: e.target.checked },
-                        }));
-                      }}
-                    />
-                    <span className="switch-label">RFM Segmented</span>
-                  </label>
+            {/* RFM Mode Section */}
+            <div className="form-section-card">
+              <h3 className="form-section-title">RFM Analysis</h3>
+              <div className="campaign-form-row" style={{ display: "flex", gap: 12, marginBottom: 0 }}>
+                <div className="form-field">
+                  <div className="switch-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={isCustomized}
+                        onChange={(e) => {
+                          setForm((prev) => ({
+                            ...prev,
+                            rfmMode: { customized: e.target.checked, segmented: !e.target.checked },
+                          }));
+                        }}
+                      />
+                      <span className="switch-label">RFM Customized</span>
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={isSegmented}
+                        onChange={(e) => {
+                          setForm((prev) => ({
+                            ...prev,
+                            rfmMode: { customized: !e.target.checked, segmented: e.target.checked },
+                          }));
+                        }}
+                      />
+                      <span className="switch-label">RFM Segmented</span>
+                    </label>
+                  </div>
                 </div>
               </div>
-            </div>
 
             {/* RFM Customized - matching reference exact horizontal scroll layout */}
             {isCustomized && (
-              <div className="rfm-customized-card" style={{ marginTop: 5, padding: 10, borderRadius: 8 }}>
-                <div
-                  className="rfm-customized-row"
-                  style={{
-                    display: "flex",
-                    gap: 4,
-                    alignItems: "flex-start",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  {/* Recency */}
-                  <div style={{ flex: "0 0 190px" }}>
+              <div className="rfm-customized-card">
+                <div className="rfm-customized-row">
+                  {/* Recency - aligned with Name and Branch (180px) */}
+                  <div style={{ flex: "0 0 180px" }}>
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label>Recency</label>
                       <div className="operator-input-group">
@@ -1115,7 +1115,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   </div>
 
                   {/* Frequency */}
-                  <div style={{ flex: "0 0 190px" }}>
+                  <div style={{ flex: "0 0 180px" }}>
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label>Frequency</label>
                       <div className="operator-input-group">
@@ -1165,7 +1165,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   </div>
 
                   {/* Monetary */}
-                  <div style={{ flex: "0 0 190px" }}>
+                  <div style={{ flex: "0 0 180px" }}>
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label>Monetary (₹)</label>
                       <div className="operator-input-group">
@@ -1265,8 +1265,8 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
 
             {/* RFM Segmented */}
             {isSegmented && options && (
-              <div style={{ marginTop: 10 }}>
-                <div style={{ flex: "0 0 180px", maxWidth: "180px" }}>
+              <div style={{ marginTop: 16 }}>
+                <div style={{ flex: "0 0 180px" }}>
                   <MultiSelectDropdown
                     name="rfmSegment"
                     label="RFM Segments"
@@ -1277,48 +1277,50 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                 </div>
               </div>
             )}
-
-            {/* Purchase Type - matching reference exact layout */}
-            <div className="form-field" style={{ marginTop: 16 }}>
-              <label>Purchase Type</label>
-              <div className="switch-group">
-                <label>
-                  <span>Any Purchase</span>
-                  <input
-                    type="checkbox"
-                    checked={form.purchaseType?.anyPurchase || false}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        purchaseType: { ...prev.purchaseType, anyPurchase: e.target.checked },
-                      }))
-                    }
-                    disabled={false}
-                  />
-                </label>
-                <label>
-                  <span>Recent Purchase</span>
-                  <input
-                    type="checkbox"
-                    checked={form.purchaseType?.recentPurchase || false}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        purchaseType: { ...prev.purchaseType, recentPurchase: e.target.checked },
-                      }))
-                    }
-                    disabled={false}
-                  />
-                </label>
-              </div>
             </div>
 
-            {/* Product Filters - matching reference exact horizontal scroll layout */}
-            <div
-              className="product-filters-row"
-             
-            >
-              {/* Brand */}
+            {/* Purchase & Product Filters Section */}
+            <div className="form-section-card">
+              <h3 className="form-section-title">Purchase & Product Filters</h3>
+              
+              {/* Purchase Type */}
+              <div className="form-field" style={{ marginBottom: 16 }}>
+                <label>Purchase Type</label>
+                <div className="switch-group">
+                  <label>
+                    <span>Any Purchase</span>
+                    <input
+                      type="checkbox"
+                      checked={form.purchaseType?.anyPurchase || false}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          purchaseType: { ...prev.purchaseType, anyPurchase: e.target.checked },
+                        }))
+                      }
+                      disabled={false}
+                    />
+                  </label>
+                  <label>
+                    <span>Recent Purchase</span>
+                    <input
+                      type="checkbox"
+                      checked={form.purchaseType?.recentPurchase || false}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          purchaseType: { ...prev.purchaseType, recentPurchase: e.target.checked },
+                        }))
+                      }
+                      disabled={false}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Product Filters - matching reference exact horizontal scroll layout */}
+              <div className="product-filters-row">
+              {/* Brand - aligned with Recency (180px) */}
               <div style={{ flex: "0 0 180px" }}>
                 <MultiSelectDropdown
                   name="purchaseBrand"
@@ -1392,9 +1394,12 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                 </div>
               </div>
             </div>
+            </div>
 
-            {/* Occasions - matching reference exact layout */}
-            <div className="campaign-form-row" style={{ display: "flex", gap: 8, marginTop: 16 }}>
+            {/* Occasions Section */}
+            <div className="form-section-card">
+              <h3 className="form-section-title">Occasions</h3>
+              <div className="campaign-form-row" style={{ display: "flex", gap: 12, marginBottom: 0 }}>
               <div style={{ flex: "0 0 180px" }}>
                 <div className="form-field" style={{ marginBottom: 0 }}>
                   <label>Birthday Range</label>
@@ -1458,12 +1463,13 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                 </div>
               </div>
             </div>
+            </div>
           </>
         )}
 
         {/* Upload Mode */}
         {watchBasedOn === "upload" && (
-          <div className="upload-card" style={{ marginTop: 5, padding: 16, borderRadius: 8 }}>
+          <div className="upload-card">
             <h3>Upload Contacts</h3>
             <div className="upload-section">
               <div>

@@ -68,169 +68,154 @@ export default function Sidebar() {
         </span>
       </button>
       <div className="ims-side-nav">
-        <div className={`ims-group ${open.master ? "open" : ""}`}>
-          <button
-            className="ims-group-hd"
-            onClick={() => toggle("master")}
-            type="button"
-            aria-expanded={open.master}
-            title={collapsed ? "Master" : undefined}
-          >
-            <span className="ico" aria-hidden="true">
-              📦
-            </span>
-            <span className="label">Master</span>
-            <span className="caret" aria-hidden="true">
-              {open.master ? "▾" : "▸"}
-            </span>
-          </button>
-          <nav aria-label="Master navigation">
-            <Link
-              to="/companies"
-              className={isActive("/companies") ? "active" : ""}
-              title={collapsed ? "Company Master" : undefined}
+        {/* Master menu - hidden */}
+        {false && (
+          <div className={`ims-group ${open.master ? "open" : ""}`}>
+            <button
+              className="ims-group-hd"
+              onClick={() => toggle("master")}
+              type="button"
+              aria-expanded={open.master}
+              title={collapsed ? "Master" : undefined}
             >
               <span className="ico" aria-hidden="true">
-                🏢
+                📦
               </span>
-              <span className="label">Company Master</span>
-            </Link>
-            <Link
-              to="/clients"
-              className={isActive("/clients") ? "active" : ""}
-              title={collapsed ? "Customer Master" : undefined}
-            >
-              <span className="ico" aria-hidden="true">
-                👤
+              <span className="label">Master</span>
+              <span className="caret" aria-hidden="true">
+                {open.master ? "▾" : "▸"}
               </span>
-              <span className="label">Customer Master</span>
-            </Link>
-            {/*
-            <Link to="/items" className={isActive("/items") ? "active" : ""}>
-              <span className="ico" aria-hidden="true">
-                🧱
-              </span>
-              Item Master
-            </Link>
-            */}
-          </nav>
-        </div>
+            </button>
+            <nav aria-label="Master navigation">
+              <Link
+                to="/companies"
+                className={isActive("/companies") ? "active" : ""}
+                title={collapsed ? "Company Master" : undefined}
+              >
+                <span className="ico" aria-hidden="true">
+                  🏢
+                </span>
+                <span className="label">Company Master</span>
+              </Link>
+              <Link
+                to="/clients"
+                className={isActive("/clients") ? "active" : ""}
+                title={collapsed ? "Customer Master" : undefined}
+              >
+                <span className="ico" aria-hidden="true">
+                  👤
+                </span>
+                <span className="label">Customer Master</span>
+              </Link>
+            </nav>
+          </div>
+        )}
 
-        <div className={`ims-group ${open.txn ? "open" : ""}`}>
-          <button
-            className="ims-group-hd"
-            onClick={() => toggle("txn")}
-            type="button"
-            aria-expanded={open.txn}
-            title={collapsed ? "Transaction" : undefined}
-          >
-            <span className="ico" aria-hidden="true">
-              🧾
-            </span>
-            <span className="label">Transaction</span>
-            <span className="caret" aria-hidden="true">
-              {open.txn ? "▾" : "▸"}
-            </span>
-          </button>
-          <nav aria-label="Transaction navigation">
-            <Link
-              to="/salesorder"
-              className={isActive("/salesorder") ? "active" : ""}
-              title={collapsed ? "Sales Order" : undefined}
+        {/* Transaction menu - hidden */}
+        {false && (
+          <div className={`ims-group ${open.txn ? "open" : ""}`}>
+            <button
+              className="ims-group-hd"
+              onClick={() => toggle("txn")}
+              type="button"
+              aria-expanded={open.txn}
+              title={collapsed ? "Transaction" : undefined}
             >
               <span className="ico" aria-hidden="true">
-                📄
+                🧾
               </span>
-              <span className="label">Sales Order</span>
-            </Link>
-            {/*
-            <Link to="/po" className={isActive("/po") ? "active" : ""}>
-              <span className="ico" aria-hidden="true">
-                🛒
+              <span className="label">Transaction</span>
+              <span className="caret" aria-hidden="true">
+                {open.txn ? "▾" : "▸"}
               </span>
-              Purchase Order
-            </Link>
-            */}
-            {/*
-            <Link to="/inventory" className={isActive("/inventory") ? "active" : ""}>
-              <span className="ico" aria-hidden="true">
-                🗃
-              </span>
-              Inventory
-            </Link>
-            */}
-            <Link
-              to="/production"
-              className={isActive("/production") ? "active" : ""}
-              title={collapsed ? "Production" : undefined}
-            >
-              <span className="ico" aria-hidden="true">
-                🏭
-              </span>
-              <span className="label">Production</span>
-            </Link>
-            <Link
-              to="/delivery"
-              className={isActive("/delivery") ? "active" : ""}
-              title={collapsed ? "Delivery" : undefined}
-            >
-              <span className="ico" aria-hidden="true">
-                🚚
-              </span>
-              <span className="label">Delivery</span>
-            </Link>
-          </nav>
-        </div>
+            </button>
+            <nav aria-label="Transaction navigation">
+              <Link
+                to="/salesorder"
+                className={isActive("/salesorder") ? "active" : ""}
+                title={collapsed ? "Sales Order" : undefined}
+              >
+                <span className="ico" aria-hidden="true">
+                  📄
+                </span>
+                <span className="label">Sales Order</span>
+              </Link>
+              <Link
+                to="/production"
+                className={isActive("/production") ? "active" : ""}
+                title={collapsed ? "Production" : undefined}
+              >
+                <span className="ico" aria-hidden="true">
+                  🏭
+                </span>
+                <span className="label">Production</span>
+              </Link>
+              <Link
+                to="/delivery"
+                className={isActive("/delivery") ? "active" : ""}
+                title={collapsed ? "Delivery" : undefined}
+              >
+                <span className="ico" aria-hidden="true">
+                  🚚
+                </span>
+                <span className="label">Delivery</span>
+              </Link>
+            </nav>
+          </div>
+        )}
 
-        <div className={`ims-group ${open.reports ? "open" : ""}`}>
-          <button
-            className="ims-group-hd"
-            onClick={() => toggle("reports")}
-            type="button"
-            aria-expanded={open.reports}
-            title={collapsed ? "Reports" : undefined}
-          >
-            <span className="ico" aria-hidden="true">
-              📊
-            </span>
-            <span className="label">Reports</span>
-            <span className="caret" aria-hidden="true">
-              {open.reports ? "▾" : "▸"}
-            </span>
-          </button>
-          <nav aria-label="Reports navigation">
-            <Link
-              to="/reports/summary"
-              className={isActive("/reports/summary") ? "active" : ""}
-              title={collapsed ? "Summary" : undefined}
+        {/* Reports menu - hidden */}
+        {false && (
+          <div className={`ims-group ${open.reports ? "open" : ""}`}>
+            <button
+              className="ims-group-hd"
+              onClick={() => toggle("reports")}
+              type="button"
+              aria-expanded={open.reports}
+              title={collapsed ? "Reports" : undefined}
             >
               <span className="ico" aria-hidden="true">
-                📈
+                📊
               </span>
-              <span className="label">Summary</span>
-            </Link>
-            <Link
-              to="/reports/production"
-              className={isActive("/reports/production") ? "active" : ""}
-              title={collapsed ? "Production Reports" : undefined}
-            >
-              <span className="ico" aria-hidden="true">
-                🏭
+              <span className="label">Reports</span>
+              <span className="caret" aria-hidden="true">
+                {open.reports ? "▾" : "▸"}
               </span>
-              <span className="label">Production</span>
-            </Link>
-            <Link
-              to="/reports/delivery"
-              className={isActive("/reports/delivery") ? "active" : ""}
-              title={collapsed ? "Delivery Reports" : undefined}
-            >
-              <span className="ico" aria-hidden="true">
-                🚚
-              </span>
-              <span className="label">Delivery</span>
-            </Link>
-          </nav>
-        </div>
+            </button>
+            <nav aria-label="Reports navigation">
+              <Link
+                to="/reports/summary"
+                className={isActive("/reports/summary") ? "active" : ""}
+                title={collapsed ? "Summary" : undefined}
+              >
+                <span className="ico" aria-hidden="true">
+                  📈
+                </span>
+                <span className="label">Summary</span>
+              </Link>
+              <Link
+                to="/reports/production"
+                className={isActive("/reports/production") ? "active" : ""}
+                title={collapsed ? "Production Reports" : undefined}
+              >
+                <span className="ico" aria-hidden="true">
+                  🏭
+                </span>
+                <span className="label">Production</span>
+              </Link>
+              <Link
+                to="/reports/delivery"
+                className={isActive("/reports/delivery") ? "active" : ""}
+                title={collapsed ? "Delivery Reports" : undefined}
+              >
+                <span className="ico" aria-hidden="true">
+                  🚚
+                </span>
+                <span className="label">Delivery</span>
+              </Link>
+            </nav>
+          </div>
+        )}
 
         <div className={`ims-group ${open.campaign ? "open" : ""}`}>
           <button

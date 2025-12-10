@@ -78,7 +78,6 @@ export default function CampaignSummary() {
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>ID</th>
                   <th>Name</th>
                   <th>Start Date</th>
                   <th>End Date</th>
@@ -95,7 +94,6 @@ export default function CampaignSummary() {
                       backgroundColor: index % 2 === 0 ? "#fafafa" : "#ffffff",
                     }}
                   >
-                    <td>{campaign.id}</td>
                     <td>
                       <strong>{campaign.name}</strong>
                     </td>

@@ -48,8 +48,8 @@
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
-  background: var(--admin-accent-gradient);
-  color: var(--admin-accent-text);
+  background: transparent;
+  color: var(--admin-page-text);
 }
 
 .btn-edit {

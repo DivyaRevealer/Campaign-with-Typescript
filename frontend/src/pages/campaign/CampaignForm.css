@@ -2,7 +2,7 @@
 
 .campaign-form-wrapper {
   font-weight: bold;
-  padding: 5px;
+  padding: 24px;
   background: var(--admin-page-bg);
   min-height: 50vh;
   color: var(--admin-page-text);
@@ -11,7 +11,7 @@
 .campaign-form-title {
   font-size: 24px;
   font-weight: 600;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
   color: var(--admin-page-text);
 }
 
@@ -20,11 +20,31 @@
   margin: 0 auto;
 }
 
+/* Form Section Cards */
+.form-section-card {
+  background: var(--admin-card-bg);
+  border: 1px solid var(--admin-card-border);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.form-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--admin-page-text);
+  margin: 0 0 16px 0;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--admin-card-border);
+}
+
 .campaign-form-row {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   margin-bottom: 16px;
   align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .campaign-form-col {
@@ -32,6 +52,7 @@
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
+  min-width: 0;
 }
 
 .form-field {
@@ -178,8 +199,8 @@
 
 /* RFM Customized Card */
 .rfm-customized-card {
-  margin-top: 5px;
-  padding: 10px;
+  margin-top: 0;
+  padding: 0;
   background: transparent;
   border-radius: 0;
   border: none;
@@ -187,15 +208,16 @@
 
 .rfm-customized-row {
   display: flex;
-  gap: 4px;
+  gap: 12px;
   align-items: flex-start;
   flex-wrap: wrap;
+  margin-top: 0;
 }
 
 /* Operator Input Group */
 .operator-input-group {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   align-items: center;
   height: 32px;
   width: 100%;
@@ -315,7 +337,7 @@
 /* Product Filters Row */
 .product-filters-row {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: flex-start;
   margin-top: 16px;
   overflow: visible;
@@ -324,11 +346,12 @@
 
 /* Upload Card */
 .upload-card {
-  margin-top: 5px;
-  padding: 16px;
+  margin-top: 0;
+  padding: 20px;
   background: var(--admin-card-bg);
   border-radius: 8px;
   border: 1px solid var(--admin-card-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .upload-card h3 {
@@ -358,7 +381,9 @@
 /* Form Actions */
 .form-actions {
   text-align: center;
-  margin-top: 5px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--admin-card-border);
 }
 
 .btn-primary {
