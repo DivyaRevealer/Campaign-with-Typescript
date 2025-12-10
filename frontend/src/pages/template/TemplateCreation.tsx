@@ -32,6 +32,11 @@ export default function TemplateCreation() {
     footer: "",
   });
 
+  // Preview state
+  const [headerText, setHeaderText] = useState("");
+  const [bodyText, setBodyText] = useState("");
+  const [footerText, setFooterText] = useState("");
+
   const filteredTemplates = templates.filter((t) =>
     [t.name, t.templateType, t.templateCreateStatus]
       .join(" ")
@@ -79,14 +84,20 @@ export default function TemplateCreation() {
       return;
     }
     setMediaFile(file);
+    // Clear error message if file is valid
+    setErrorMsg("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
     setSuccessMsg("");
+    setLoading(true);
 
     try {
+      const templateName = formData.name.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+      let createSuccess = false;
+
       if (templateType === "text") {
         const bodyHasVars = /\{\{\d+\}\}/.test(formData.body);
 
@@ -102,7 +113,7 @@ export default function TemplateCreation() {
             };
 
         const payload = {
-          name: formData.name.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+          name: templateName,
           language: formData.language,
           category: formData.category,
           components: [
@@ -113,18 +124,15 @@ export default function TemplateCreation() {
         };
 
         const res = await createTextTemplate(payload);
-        if (res.data.success === true) {
-          await handleSyncTemplate(formData.name.toLowerCase().replace(/[^a-z0-9_]/g, "_"));
-        }
-        setOpen(false);
-        resetForm();
+        createSuccess = res.data.success === true;
       } else {
         if (!mediaFile) {
           setErrorMsg("Please upload media file");
+          setLoading(false);
           return;
         }
         const formDataObj = new FormData();
-        formDataObj.append("name", formData.name.toLowerCase().replace(/[^a-z0-9_]/g, "_"));
+        formDataObj.append("name", templateName);
         formDataObj.append("language", formData.language);
         formDataObj.append("category", formData.category);
         formDataObj.append("body", formData.body);
@@ -133,16 +141,29 @@ export default function TemplateCreation() {
 
         const endpoint = mediaType === "image" ? createImageTemplate : createVideoTemplate;
         const res = await endpoint(formDataObj);
-        if (res.data.success === true) {
-          await handleSyncTemplate(formData.name.toLowerCase().replace(/[^a-z0-9_]/g, "_"));
+        createSuccess = res.data.success === true;
+      }
+
+      if (createSuccess) {
+        // Automatically sync template after creation to approve it
+        try {
+          await handleSyncTemplate(templateName);
+          setSuccessMsg("Template created and synced successfully");
+        } catch (syncErr) {
+          // Template created but sync failed - still show success but warn about sync
+          setSuccessMsg("Template created successfully, but sync failed. Please sync manually.");
+          console.error("Sync error:", syncErr);
         }
+        await loadTemplates();
         setOpen(false);
         resetForm();
+      } else {
+        setErrorMsg("Template creation failed");
       }
-      await loadTemplates();
-      setSuccessMsg("Template created successfully");
     } catch (err) {
       setErrorMsg(extractApiErrorMessage(err, "Failed to create template"));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -170,6 +191,9 @@ export default function TemplateCreation() {
     setTemplateType("text");
     setMediaType("image");
     setMediaFile(null);
+    setHeaderText("");
+    setBodyText("");
+    setFooterText("");
   };
 
   const statusColors: Record<string, string> = {
@@ -266,14 +290,15 @@ export default function TemplateCreation() {
       {open && (
         <>
           <div className="modal-backdrop" onClick={() => setOpen(false)} />
-          <div className="modal-panel">
+          <div className="modal-panel modal-panel-wide">
             <header>
               <h2>Create Template</h2>
               <button className="icon-button" onClick={() => setOpen(false)} aria-label="Close">
                 ×
               </button>
             </header>
-            <form onSubmit={handleSubmit} className="template-form">
+            <div className="template-form-with-preview">
+              <form onSubmit={handleSubmit} className="template-form">
               <div className="form-field">
                 <label htmlFor="name">Name *</label>
                 <input
@@ -371,7 +396,10 @@ export default function TemplateCreation() {
                   id="header"
                   type="text"
                   value={formData.header}
-                  onChange={(e) => setFormData({ ...formData, header: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, header: e.target.value });
+                    setHeaderText(e.target.value);
+                  }}
                 />
               </div>
 
@@ -380,9 +408,12 @@ export default function TemplateCreation() {
                 <textarea
                   id="body"
                   required
-                  rows={4}
+                  rows={3}
                   value={formData.body}
-                  onChange={(e) => setFormData({ ...formData, body: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, body: e.target.value });
+                    setBodyText(e.target.value);
+                  }}
                 />
               </div>
 
@@ -392,19 +423,90 @@ export default function TemplateCreation() {
                   id="footer"
                   type="text"
                   value={formData.footer}
-                  onChange={(e) => setFormData({ ...formData, footer: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, footer: e.target.value });
+                    setFooterText(e.target.value);
+                  }}
                 />
               </div>
 
               <div className="form-actions">
-                <button type="submit" className="btn-primary">
-                  Submit
+                <button type="submit" className="btn-primary" disabled={loading}>
+                  {loading ? "Creating & Syncing..." : "Submit"}
                 </button>
-                <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>
+                <button type="button" className="btn-secondary" onClick={() => setOpen(false)} disabled={loading}>
                   Cancel
                 </button>
               </div>
             </form>
+
+            {/* WhatsApp Preview */}
+            <div className="whatsapp-preview">
+              <div className="phone-mockup">
+                {/* Phone Status Bar */}
+                <div className="phone-status-bar">
+                  <span>17:12</span>
+                  <div className="status-icons">
+                    <span>📶</span>
+                    <span>🔋</span>
+                  </div>
+                </div>
+
+                {/* WhatsApp Header */}
+                <div className="whatsapp-header">
+                  <div className="whatsapp-header-left">
+                    <span className="back-arrow">←</span>
+                    <div className="whatsapp-avatar">W</div>
+                    <span className="whatsapp-title">
+                      TEMPLATE PREVIEW <span className="check-mark">✔</span>
+                    </span>
+                  </div>
+                  <span className="info-icon">ℹ️</span>
+                </div>
+
+                {/* Message Content */}
+                <div className="whatsapp-content">
+                  {/* Header Media or Text */}
+                  {mediaFile && (
+                    <div className="preview-media">
+                      {mediaType === "image" ? (
+                        <img
+                          src={URL.createObjectURL(mediaFile)}
+                          alt="header preview"
+                          className="preview-image"
+                        />
+                      ) : (
+                        <video
+                          src={URL.createObjectURL(mediaFile)}
+                          controls
+                          className="preview-video"
+                        />
+                      )}
+                      {headerText && (
+                        <div className="preview-header-text">{headerText}</div>
+                      )}
+                    </div>
+                  )}
+
+                  {!mediaFile && headerText && (
+                    <div className="preview-header-text-only">{headerText}</div>
+                  )}
+
+                  {/* Body Text */}
+                  {bodyText && (
+                    <div className="whatsapp-message-bubble">
+                      {bodyText}
+                    </div>
+                  )}
+
+                  {/* Footer Text */}
+                  {footerText && (
+                    <div className="preview-footer-text">{footerText}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+            </div>
           </div>
         </>
       )}

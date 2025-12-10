@@ -131,44 +131,79 @@
   z-index: 1001;
 }
 
+.modal-panel-wide {
+  max-width: 1100px;
+  top: 10px;
+  transform: translate(-50%, 0);
+  max-height: 95vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .modal-panel header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--admin-panel-border);
 }
 
 .modal-panel header h2 {
   margin: 0;
   color: var(--admin-page-text);
+  font-size: 18px;
 }
 
 .template-form {
-  padding: 20px;
+  padding: 0;
+}
+
+.template-form-with-preview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 12px;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.template-form {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+@media (max-width: 1024px) {
+  .template-form-with-preview {
+    grid-template-columns: 1fr;
+  }
 }
 
 .form-field {
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 .form-field label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   color: var(--admin-label-text);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .form-field input,
 .form-field select,
 .form-field textarea {
   width: 100%;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: var(--admin-input-bg);
   border: 1px solid var(--admin-input-border);
   border-radius: 4px;
   color: var(--admin-input-text);
-  font-size: 14px;
+  font-size: 13px;
   font-family: inherit;
 }
 
@@ -182,14 +217,14 @@
 
 .form-field small {
   display: block;
-  margin-top: 4px;
+  margin-top: 2px;
   color: var(--admin-muted-text);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .radio-group {
   display: flex;
-  gap: 16px;
+  gap: 12px;
 }
 
 .radio-group label {
@@ -205,18 +240,18 @@
 
 .form-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   justify-content: flex-end;
-  margin-top: 24px;
+  margin-top: 12px;
 }
 
 .btn-primary {
-  padding: 8px 16px;
+  padding: 6px 14px;
   background: var(--admin-accent-gradient);
   border: 1px solid var(--admin-accent-border);
   border-radius: 4px;
   color: var(--admin-accent-text);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
 }
@@ -226,12 +261,12 @@
 }
 
 .btn-secondary {
-  padding: 8px 16px;
+  padding: 6px 14px;
   background: var(--admin-secondary-bg);
   border: 1px solid var(--admin-secondary-border);
   border-radius: 4px;
   color: var(--admin-secondary-text);
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -295,4 +330,151 @@
 
 .icon-button:hover {
   opacity: 0.7;
+}
+
+/* WhatsApp Preview Styles - Matching Reference Project Exactly */
+.whatsapp-preview {
+  display: flex;
+  justify-content: flex-start;
+  align-items: stretch;
+  margin-top: 0;
+  height: 100%;
+}
+
+.phone-mockup {
+  border: 2px solid #ccc;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 280px;
+  margin: 0 auto;
+  background: #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  min-height: 100%;
+}
+
+.phone-status-bar {
+  background: #ededed;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  font-size: 11px;
+  color: #000;
+  width: 100%;
+}
+
+.status-icons {
+  display: flex;
+  gap: 186px;
+}
+
+.whatsapp-header {
+  background: #075E54;
+  color: #fff;
+  width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  border-radius: 12px 12px 0 0;
+}
+
+.whatsapp-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.back-arrow {
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.whatsapp-avatar {
+  background-color: #25D366;
+  border-radius: 50%;
+  width: 26px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.whatsapp-title {
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.check-mark {
+  color: #34B7F1;
+}
+
+.info-icon {
+  font-size: 16px;
+}
+
+.whatsapp-content {
+  flex: 1;
+  width: 100%;
+  background: #fff;
+  padding: 10px;
+  margin-top: 0;
+  border-radius: 0 0 12px 12px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+.preview-media {
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+.preview-image,
+.preview-video {
+  width: 100%;
+  border-radius: 8px;
+}
+
+.preview-video {
+  max-height: 200px;
+  object-fit: cover;
+}
+
+.preview-header-text {
+  font-size: 12px;
+  color: #444;
+  margin-top: 3px;
+}
+
+.preview-header-text-only {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 6px;
+}
+
+.whatsapp-message-bubble {
+  background: #dcf8c6;
+  padding: 8px 12px;
+  border-radius: 6px;
+  max-width: 80%;
+  font-size: 13px;
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+.preview-footer-text {
+  font-size: 10px;
+  color: #888;
+  margin-top: 3px;
 }
