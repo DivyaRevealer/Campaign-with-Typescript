@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { FaBars, FaChevronDown, FaChevronRight, FaChartBar, FaPlusCircle, FaListAlt, FaFileAlt, FaPlayCircle, FaSignOutAlt } from "react-icons/fa";
 
 import { ACCESS_TOKEN_KEY, LOGOUT_EVENT, dispatchAuthEvent } from "@/constants/auth";
 
@@ -51,21 +52,7 @@ export default function Sidebar() {
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
-        <span
-          className={`chevron ${collapsed ? "collapsed" : ""}`}
-          aria-hidden="true"
-        >
-          <svg viewBox="0 0 24 24" role="presentation" focusable="false">
-            <path
-              d="M14 6l-6 6 6 6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
+        <FaBars />
       </button>
       <div className="ims-side-nav">
         {/* Master menu - hidden */}
@@ -230,7 +217,7 @@ export default function Sidebar() {
             </span>
             <span className="label">Campaign</span>
             <span className="caret" aria-hidden="true">
-              {open.campaign ? "▾" : "▸"}
+              {open.campaign ? <FaChevronDown /> : <FaChevronRight />}
             </span>
           </button>
           <nav aria-label="Campaign navigation">
@@ -240,7 +227,7 @@ export default function Sidebar() {
               title={collapsed ? "Dashboard" : undefined}
             >
               <span className="ico" aria-hidden="true">
-                📊
+                <FaChartBar />
               </span>
               <span className="label">Dashboard</span>
             </Link>
@@ -250,7 +237,7 @@ export default function Sidebar() {
               title={collapsed ? "Create Campaign" : undefined}
             >
               <span className="ico" aria-hidden="true">
-                ➕
+                <FaPlusCircle />
               </span>
               <span className="label">Create Campaign</span>
             </Link>
@@ -260,7 +247,7 @@ export default function Sidebar() {
               title={collapsed ? "Campaign Summary" : undefined}
             >
               <span className="ico" aria-hidden="true">
-                📋
+                <FaListAlt />
               </span>
               <span className="label">Campaign Summary</span>
             </Link>
@@ -270,7 +257,7 @@ export default function Sidebar() {
               title={collapsed ? "Create Template" : undefined}
             >
               <span className="ico" aria-hidden="true">
-                📝
+                <FaFileAlt />
               </span>
               <span className="label">Create Template</span>
             </Link>
@@ -280,7 +267,7 @@ export default function Sidebar() {
               title={collapsed ? "Run Template" : undefined}
             >
               <span className="ico" aria-hidden="true">
-                ▶️
+                <FaPlayCircle />
               </span>
               <span className="label">Run Template</span>
             </Link>
@@ -296,32 +283,7 @@ export default function Sidebar() {
           title={collapsed ? "Sign out" : undefined}
         >
           <span className="ico" aria-hidden="true">
-            <svg viewBox="0 0 24 24" role="presentation" focusable="false">
-              <path
-                d="M10 4H7a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h3"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
-              <path
-                d="M13 8l4 4-4 4"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
-              <path
-                d="M17 12H6"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
-            </svg>
+            <FaSignOutAlt />
           </span>
           <span className="label">Sign out</span>
         </Link>

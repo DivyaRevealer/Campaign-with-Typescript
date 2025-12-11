@@ -10,7 +10,7 @@ export default function Topbar() {
 
   return (
     <header className="ims-topbar">
-      <h1 className="ims-topbar__title">Inventory Management System</h1>
+      <h1 className="ims-topbar__title">Campaign Management System</h1>
       <div className="ims-topbar__actions">
         <AdminThemeToggle theme={theme} onToggle={toggleTheme} />
         <div className="ims-topbar__user" aria-live="polite">

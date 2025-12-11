@@ -10,8 +10,7 @@ import {
   dispatchAuthEvent,
 } from "@/constants/auth";
 
-import logo from "@/assets/logo.png";
-
+import revealerLogo from "@/assets/revealer-logo.png";
 import "./Login.css";
 
 export default function Login() {
@@ -68,8 +67,8 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-header">
-          <img src={logo} alt="Company logo" className="login-logo" />
-          <h1 className="login-heading" style={{ textAlign: 'center' }}>Inventory Management System</h1>
+          <img src={revealerLogo} alt="Revealer logo" className="login-logo" />
+          <h1 className="login-heading" style={{ textAlign: 'center' }}>Campaign Management System</h1>
           {/*
           <p className="login-subtitle">
             Track stock levels, fulfil orders, and keep your operations aligned in

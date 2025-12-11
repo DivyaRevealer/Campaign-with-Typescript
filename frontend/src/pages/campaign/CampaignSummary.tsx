@@ -90,9 +90,7 @@ export default function CampaignSummary() {
                 {campaigns.map((campaign, index) => (
                   <tr
                     key={campaign.id}
-                    style={{
-                      backgroundColor: index % 2 === 0 ? "#fafafa" : "#ffffff",
-                    }}
+                    className={index % 2 === 0 ? "row-even" : "row-odd"}
                   >
                     <td>
                       <strong>{campaign.name}</strong>

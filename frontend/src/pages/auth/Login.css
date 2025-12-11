@@ -54,6 +54,27 @@
 .login-logo {
   width: 170px;
   height: auto;
+  max-width: 100%;
+  object-fit: contain;
+  display: block;
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+/* Light mode - show original logo (assuming it's dark/colored) */
+body[data-admin-theme="light"] .login-logo,
+body:not([data-admin-theme]) .login-logo {
+  filter: none;
+  opacity: 1;
+}
+
+/* Dark mode - invert to make it light/visible */
+body[data-admin-theme="dark"] .login-logo {
+  filter: brightness(0) invert(1);
+  opacity: 0.95;
+}
+
+.login-logo:hover {
+  opacity: 1;
 }
 
 .login-heading {

@@ -115,14 +115,14 @@
 }
 
 .admin-table thead {
-  background: var(--admin-table-header-bg, #f5f5f5);
+  background: var(--admin-table-header-bg, var(--admin-card-bg));
 }
 
 .admin-table th {
   padding: 12px;
   text-align: left;
   font-weight: 600;
-  color: var(--admin-label-text);
+  color: var(--admin-label-text, var(--admin-page-text));
   border-bottom: 2px solid var(--admin-card-border);
 }
 
@@ -132,11 +132,24 @@
   color: var(--admin-page-text);
 }
 
+.admin-table tbody tr.row-even {
+  background: var(--admin-table-row-even-bg, var(--admin-card-bg));
+}
+
+.admin-table tbody tr.row-odd {
+  background: var(--admin-table-row-odd-bg, transparent);
+}
+
 .admin-table tbody tr:hover {
-  background: var(--admin-table-hover-bg, #f9f9f9);
+  background: var(--admin-table-hover-bg, rgba(255, 255, 255, 0.05));
 }
 
 .admin-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+.admin-table td strong {
+  color: var(--admin-page-text);
+  font-weight: 600;
 }
 
