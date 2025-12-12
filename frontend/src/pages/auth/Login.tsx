@@ -10,7 +10,6 @@ import {
   dispatchAuthEvent,
 } from "@/constants/auth";
 
-import revealerLogo from "@/assets/revealer-logo.png";
 import "./Login.css";
 
 export default function Login() {
@@ -67,7 +66,15 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-header">
-          <img src={revealerLogo} alt="Revealer logo" className="login-logo" />
+          <img 
+            src="/revealer-logo.png" 
+            alt="Revealer logo" 
+            className="login-logo"
+            onError={(e) => {
+              console.error('Logo failed to load from /revealer-logo.png');
+              e.currentTarget.style.display = 'none';
+            }}
+          />
           <h1 className="login-heading" style={{ textAlign: 'center' }}>Campaign Management System</h1>
           {/*
           <p className="login-subtitle">

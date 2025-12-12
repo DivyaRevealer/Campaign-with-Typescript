@@ -882,7 +882,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
   const isSegmented = rfmMode.segmented === true;
 
   return (
-    <div className="campaign-form-wrapper" style={{ fontWeight: "bold", padding: 5, minHeight: "50vh" }}>
+    <div className="campaign-form-wrapper">
       <h2 className="campaign-form-title">{isEditing ? "Update Campaign" : "Create Campaign"}</h2>
 
       <form className="campaign-form" onSubmit={submit} style={{ maxWidth: 1360, margin: "0 auto" }}>
@@ -897,7 +897,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                 border: "none",
                 color: "inherit",
                 cursor: "pointer",
-                fontSize: "18px",
+                fontSize: "13px",
                 fontWeight: "bold",
                 padding: "0 8px",
                 marginLeft: "12px",
@@ -913,9 +913,8 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
 
         {/* Basic Information Section */}
         <div className="form-section-card">
-          <h3 className="form-section-title">Basic Information</h3>
-          <div className="campaign-form-row" style={{ display: "flex", gap: 12, marginBottom: 0 }}>
-            <div className="campaign-form-col" style={{ flex: "0 0 180px" }}>
+          <div className="campaign-form-row" style={{ display: "flex", gap: 8, marginBottom: 0 }}>
+            <div className="campaign-form-col" style={{ flex: "0 0 170px" }}>
               <div className="form-field" style={{ marginBottom: 0 }}>
                 <label>Name</label>
                 <input
@@ -993,8 +992,8 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
             {/* Geography Section */}
             <div className="form-section-card">
               <h3 className="form-section-title">Geography</h3>
-              <div className="campaign-form-row" style={{ display: "flex", gap: 12, marginBottom: 0 }}>
-              <div className="campaign-form-col" style={{ flex: "0 0 180px" }}>
+              <div className="campaign-form-row" style={{ display: "flex", gap: 8, marginBottom: 0 }}>
+              <div className="campaign-form-col" style={{ flex: "0 0 170px" }}>
                 <MultiSelectDropdown
                   name="branch"
                   label="Branch"
@@ -1003,7 +1002,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   disabled={false}
                 />
               </div>
-              <div className="campaign-form-col" style={{ flex: "0 0 180px" }}>
+              <div className="campaign-form-col" style={{ flex: "0 0 170px" }}>
                 <MultiSelectDropdown
                   name="city"
                   label="City"
@@ -1012,7 +1011,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   disabled={false}
                 />
               </div>
-              <div className="campaign-form-col" style={{ flex: "0 0 180px" }}>
+              <div className="campaign-form-col" style={{ flex: "0 0 170px" }}>
                 <MultiSelectDropdown
                   name="state"
                   label="State"
@@ -1027,7 +1026,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
             {/* RFM Mode Section */}
             <div className="form-section-card">
               <h3 className="form-section-title">RFM Analysis</h3>
-              <div className="campaign-form-row" style={{ display: "flex", gap: 12, marginBottom: 0 }}>
+              <div className="campaign-form-row" style={{ display: "flex", gap: 8, marginBottom: 0 }}>
                 <div className="form-field">
                   <div className="switch-group">
                     <label>
@@ -1037,7 +1036,10 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                         onChange={(e) => {
                           setForm((prev) => ({
                             ...prev,
-                            rfmMode: { customized: e.target.checked, segmented: !e.target.checked },
+                            rfmMode: { 
+                              customized: e.target.checked,
+                              segmented: e.target.checked ? false : (prev.rfmMode?.segmented || false),
+                            },
                           }));
                         }}
                       />
@@ -1050,7 +1052,10 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                         onChange={(e) => {
                           setForm((prev) => ({
                             ...prev,
-                            rfmMode: { customized: !e.target.checked, segmented: e.target.checked },
+                            rfmMode: { 
+                              segmented: e.target.checked,
+                              customized: e.target.checked ? false : (prev.rfmMode?.customized || false),
+                            },
                           }));
                         }}
                       />
@@ -1065,7 +1070,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
               <div className="rfm-customized-card">
                 <div className="rfm-customized-row">
                   {/* Recency - aligned with Name and Branch (180px) */}
-                  <div style={{ flex: "0 0 180px" }}>
+                  <div style={{ flex: "0 0 170px" }}>
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label>Recency</label>
                       <div className="operator-input-group">
@@ -1115,7 +1120,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   </div>
 
                   {/* Frequency */}
-                  <div style={{ flex: "0 0 180px" }}>
+                  <div style={{ flex: "0 0 170px" }}>
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label>Frequency</label>
                       <div className="operator-input-group">
@@ -1165,7 +1170,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   </div>
 
                   {/* Monetary */}
-                  <div style={{ flex: "0 0 180px" }}>
+                  <div style={{ flex: "0 0 170px" }}>
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label>Monetary (₹)</label>
                       <div className="operator-input-group">
@@ -1220,7 +1225,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   {/* R-Score */}
                   {optionsLoaded && options && (
                     <>
-                      <div style={{ flex: "0 0 180px" }}>
+                      <div style={{ flex: "0 0 170px" }}>
                         <MultiSelect
                           name="rScore"
                           label="R-Score"
@@ -1233,7 +1238,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                       </div>
 
                       {/* F-Score */}
-                      <div style={{ flex: "0 0 180px" }}>
+                      <div style={{ flex: "0 0 170px" }}>
                         <MultiSelect
                           name="fScore"
                           label="F-Score"
@@ -1246,7 +1251,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                       </div>
 
                       {/* M-Score */}
-                      <div style={{ flex: "0 0 180px" }}>
+                      <div style={{ flex: "0 0 170px" }}>
                         <MultiSelect
                           name="mScore"
                           label="M-Score"
@@ -1265,8 +1270,8 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
 
             {/* RFM Segmented */}
             {isSegmented && options && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ flex: "0 0 180px" }}>
+              <div style={{ marginTop: 4 }}>
+                <div style={{ flex: "0 0 170px" }}>
                   <MultiSelectDropdown
                     name="rfmSegment"
                     label="RFM Segments"
@@ -1284,9 +1289,11 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
               <h3 className="form-section-title">Purchase & Product Filters</h3>
               
               {/* Purchase Type */}
-              <div className="form-field" style={{ marginBottom: 16 }}>
-                <label>Purchase Type</label>
-                <div className="switch-group">
+              <div className="form-field" style={{ marginBottom: 4 }}>
+                <div className="switch-group" style={{ alignItems: "center" }}>
+                  <label style={{ marginBottom: 0, marginRight: 8, fontWeight: 600, color: "var(--admin-label-text)", fontSize: "13px" }}>
+                    Purchase Type:
+                  </label>
                   <label>
                     <span>Any Purchase</span>
                     <input
@@ -1399,7 +1406,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
             {/* Occasions Section */}
             <div className="form-section-card">
               <h3 className="form-section-title">Occasions</h3>
-              <div className="campaign-form-row" style={{ display: "flex", gap: 12, marginBottom: 0 }}>
+              <div className="campaign-form-row" style={{ display: "flex", gap: 8, marginBottom: 0 }}>
               <div style={{ flex: "0 0 180px" }}>
                 <div className="form-field" style={{ marginBottom: 0 }}>
                   <label>Birthday Range</label>
@@ -1501,7 +1508,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   </>
                 )}
               </div>
-              <div style={{ marginTop: 12 }}>
+              <div style={{ marginTop: 4 }}>
                 <input
                   type="file"
                   accept=".xlsx,.xls,.csv"
@@ -1516,7 +1523,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
         )}
 
         {/* Submit Button - matching reference exact layout */}
-        <div className="form-actions" style={{ textAlign: "center", marginTop: 5 }}>
+        <div className="form-actions" style={{ textAlign: "center" }}>
           <button
             type="button"
             className="btn-primary"
@@ -1528,7 +1535,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
               !form.campaignPeriod[0] ||
               !form.campaignPeriod[1]
             }
-            style={{ padding: "8px 24px", fontSize: "16px" }}
+            style={{ padding: "8px 24px", fontSize: "13px" }}
           >
             {loading ? "Processing..." : isEditing ? "Update Campaign" : "Check and Create Campaign"}
           </button>
