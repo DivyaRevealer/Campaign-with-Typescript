@@ -62,6 +62,55 @@ const GRADIENTS = [
   { id: "grad6", start: "#1fa2ff", end: "#12d8fa" }
 ];
 
+type SegmentTreemapNode = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  name: string;
+  value?: number;
+  fill: string;
+};
+
+
+const renderSegmentTreemapContent = (props: SegmentTreemapNode) => {
+  const { x, y, width, height, name, value, fill } = props;
+  const centerX = x + width / 2;
+  const centerY = y + height / 2;
+  const headingSize = Math.max(Math.min(width / 10, 14), 9);
+  const valueSize = Math.max(Math.min(width / 14, 12), 9);
+
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={height} style={{ fill, stroke: "#fff", strokeWidth: 2 }} />
+      <text
+        x={centerX}
+        y={centerY - 4}
+        textAnchor="middle"
+        fill="#000"
+        stroke="none"
+        fontSize={headingSize}
+        fontWeight={40}
+        style={{ textShadow: "none" }}
+      >
+        {name}
+      </text>
+      <text
+        x={centerX}
+        y={centerY + 16}
+        textAnchor="middle"
+        fill="#000"
+        stroke="none"
+        fontSize={valueSize}
+        fontWeight={400}
+        style={{ textShadow: "none" }}
+      >
+        {value?.toLocaleString()}
+      </text>
+    </g>
+  );
+};
+
 
 // Mock data - Fallback when API is not available
 const mockKPIData: CampaignKPIData = {
@@ -801,6 +850,7 @@ export default function CampaignDashboard() {
                   stroke="#fff"
                   fill="#8884d8"
                   isAnimationActive={false}
+                  content={renderSegmentTreemapContent}
                 >
                   <Tooltip 
                     content={({ active, payload }) => {
