@@ -43,7 +43,7 @@ export default function Login() {
       if (token) {
         localStorage.setItem(ACCESS_TOKEN_KEY, token);
         dispatchAuthEvent(LOGIN_EVENT);
-        nav("/", { replace: true });
+        nav("/campaign/dashboard", { replace: true });
         return;
       } else {
         setMessage("No access token returned");

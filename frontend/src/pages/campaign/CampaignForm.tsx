@@ -520,6 +520,38 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
     })();
     const ALL = "__ALL__";
     const [isOpen, setIsOpen] = useState(false);
+    const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) &&
+            wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+          setIsOpen(false);
+          setDropdownPosition(null);
+        }
+      };
+      if (isOpen) {
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+          document.removeEventListener("mousedown", handleClickOutside);
+        };
+      }
+    }, [isOpen]);
+
+    useEffect(() => {
+      if (isOpen && wrapperRef.current) {
+        const rect = wrapperRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: rect.bottom + 4,
+          left: rect.left,
+          width: rect.width,
+        });
+      } else {
+        setDropdownPosition(null);
+      }
+    }, [isOpen]);
 
     const handleChange = (vals: string[]) => {
       if (vals.includes(ALL) && !selected.includes(ALL)) {
@@ -533,11 +565,30 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
 
     const isAllSelected = allowed.length > 0 && selected.length === allowed.length;
 
+    const handleOpen = () => {
+      if (!disabled) {
+        setIsOpen(!isOpen);
+        // Calculate position immediately on next frame
+        if (!isOpen && wrapperRef.current) {
+          requestAnimationFrame(() => {
+            if (wrapperRef.current) {
+              const rect = wrapperRef.current.getBoundingClientRect();
+              setDropdownPosition({
+                top: rect.bottom + 4,
+                left: rect.left,
+                width: rect.width,
+              });
+            }
+          });
+        }
+      }
+    };
+
     return (
-      <div className="form-field">
+      <div className={`form-field ${isOpen ? "has-dropdown-open" : ""}`}>
         <label>{label}</label>
-        <div className="multi-select-wrapper">
-          <div className="multi-select" onClick={() => !disabled && setIsOpen(!isOpen)}>
+        <div className={`multi-select-wrapper ${isOpen ? "open" : ""}`} ref={wrapperRef}>
+          <div className="multi-select" onClick={handleOpen}>
             <div className="multi-select-display">
               {selected.length === 0
                 ? placeholder
@@ -546,7 +597,15 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   : `${selected.length} selected`}
             </div>
             {isOpen && !disabled && (
-              <div className="multi-select-dropdown">
+              <div 
+                className="multi-select-dropdown"
+                ref={dropdownRef}
+                style={{
+                  top: `${dropdownPosition?.top ?? 0}px`,
+                  left: `${dropdownPosition?.left ?? 0}px`,
+                  width: `${dropdownPosition?.width ?? 0}px`,
+                }}
+              >
                 <div
                   className="multi-select-option"
                   onClick={(e) => {
@@ -600,12 +659,15 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
     disabled?: boolean;
   }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const wrapperRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
         if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
           setIsOpen(false);
+          setDropdownPosition(null);
         }
       };
       document.addEventListener("mousedown", handleClickOutside);
@@ -613,6 +675,19 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
         document.removeEventListener("mousedown", handleClickOutside);
       };
     }, []);
+
+    useEffect(() => {
+      if (isOpen && wrapperRef.current) {
+        const rect = wrapperRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: rect.bottom + 4,
+          left: rect.left,
+          width: rect.width,
+        });
+      } else {
+        setDropdownPosition(null);
+      }
+    }, [isOpen]);
 
     const handleToggle = (val: string) => {
       const numVal = parseInt(val, 10);
@@ -637,11 +712,30 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
 
     const isAllSelected = allowed.length > 0 && selected.length === allowed.length;
 
+    const handleOpen = () => {
+      if (!disabled) {
+        setIsOpen(!isOpen);
+        // Calculate position immediately on next frame
+        if (!isOpen && wrapperRef.current) {
+          requestAnimationFrame(() => {
+            if (wrapperRef.current) {
+              const rect = wrapperRef.current.getBoundingClientRect();
+              setDropdownPosition({
+                top: rect.bottom + 4,
+                left: rect.left,
+                width: rect.width,
+              });
+            }
+          });
+        }
+      }
+    };
+
     return (
-      <div className="form-field" style={{ marginBottom: 0 }}>
+      <div className={`form-field ${isOpen ? "has-dropdown-open" : ""}`} style={{ marginBottom: 0 }}>
         <label>{label}</label>
-        <div className="multi-select-wrapper" ref={dropdownRef}>
-          <div className={`multi-select ${disabled ? "disabled" : ""}`} onClick={() => !disabled && setIsOpen(!isOpen)}>
+        <div className={`multi-select-wrapper ${isOpen ? "open" : ""}`} ref={wrapperRef}>
+          <div className={`multi-select ${disabled ? "disabled" : ""}`} onClick={handleOpen}>
             <div className="multi-select-display">
               {selected.length === 0
                 ? placeholder
@@ -649,8 +743,16 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   ? `All (${selected.length})`
                   : `${selected.length} selected`}
             </div>
-            {isOpen && !disabled && (
-              <div className="multi-select-dropdown">
+            {isOpen && !disabled && dropdownPosition && (
+              <div 
+                className="multi-select-dropdown"
+                ref={dropdownRef}
+                style={{
+                  top: `${dropdownPosition?.top ?? 0}px`,
+                  left: `${dropdownPosition?.left ?? 0}px`,
+                  width: `${dropdownPosition?.width ?? 0}px`,
+                }}
+              >
                 <div className="multi-select-option" onClick={(e) => { e.stopPropagation(); handleSelectAll(); }}>
                   <input type="checkbox" checked={isAllSelected} readOnly />
                   <span>All</span>

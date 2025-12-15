@@ -1,6 +1,6 @@
 """Pydantic models for campaign dashboard endpoints."""
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -63,6 +63,8 @@ class FilterOptions(BaseModel):
 
     customer_mobiles: List[str] = Field(default_factory=list, description="List of customer mobile numbers")
     customer_names: List[str] = Field(default_factory=list, description="List of customer names")
+    customer_mobile_to_name: Dict[str, str] = Field(default_factory=dict, description="Mapping of customer mobile to customer name")
+    customer_name_to_mobile: Dict[str, str] = Field(default_factory=dict, description="Mapping of customer name to customer mobile")
     r_value_buckets: List[str] = Field(default_factory=list, description="List of R value buckets")
     f_value_buckets: List[str] = Field(default_factory=list, description="List of F value buckets")
     m_value_buckets: List[str] = Field(default_factory=list, description="List of M value buckets")

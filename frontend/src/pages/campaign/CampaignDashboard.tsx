@@ -27,6 +27,7 @@ import {
   type FilterOptions,
 } from "../../api/campaign";
 import { extractApiErrorMessage } from "../../api/errors";
+import Autocomplete from "../../components/Autocomplete";
 import "../common/adminTheme.css";
 import "./CampaignDashboard.css";
 
@@ -41,25 +42,26 @@ interface DashboardFilters {
   mValueBucket: string;
 }
 
-const COLORS = {
-  primary: "#14b8a6",
-  secondary: "#0d9488",
-  accent: "#06b6d4",
-  orange: "#f97316",
-  purple: "#a855f7",
-  teal: "#2dd4bf",
-  yellow: "#eab308",
-  red: "#ef4444",
-};
-
-const KPI_CARD_COLORS = [
-  COLORS.primary,
-  COLORS.accent,
-  COLORS.orange,
-  COLORS.purple,
-  COLORS.teal,
-  COLORS.secondary,
+// Chart colors matching reference project
+const COLORS = [
+  '#536d8e', // main tile blue
+  '#c8a036', // accent gold
+  '#205166', // darker blue
+  '#914545', // red-brown
+  '#009292', // teal
+  '#583f74', // purple
 ];
+
+// Gradients for pie charts (matching reference project)
+const GRADIENTS = [
+  { id: "grad1", start: "#536d8e", end: "#914545" },
+  { id: "grad2", start: "#c8a036", end: "#ffdb70" },
+  { id: "grad3", start: "#205166", end: "#009292" },
+  { id: "grad4", start: "#583f74", end: "#8e6ccf" },
+  { id: "grad5", start: "#d84a4a", end: "#ffb199" },
+  { id: "grad6", start: "#1fa2ff", end: "#12d8fa" }
+];
+
 
 // Mock data - Fallback when API is not available
 const mockKPIData: CampaignKPIData = {
@@ -194,6 +196,8 @@ export default function CampaignDashboard() {
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     customer_mobiles: [],
     customer_names: [],
+    customer_mobile_to_name: {},
+    customer_name_to_mobile: {},
     r_value_buckets: [],
     f_value_buckets: [],
     m_value_buckets: [],
@@ -212,45 +216,66 @@ export default function CampaignDashboard() {
   const [daysToReturnBucketData, setDaysToReturnBucketData] = useState<DaysToReturnBucketData[]>(mockDaysToReturnBucketData);
   const [fiscalYearData, setFiscalYearData] = useState<FiscalYearData[]>(mockFiscalYearData);
   const [chartsReady, setChartsReady] = useState(false);
-
+  const dashboardRequestRef = useRef<AbortController | null>(null);
   const handleFilterChange = (field: keyof DashboardFilters, value: string) => {
-    setFilters((prev) => ({ ...prev, [field]: value }));
+    setFilters((prev) => {
+      const updated = { ...prev, [field]: value };
+      
+      // Sync customer mobile and customer name
+      if (field === "customerMobile" && value !== "All") {
+        const customerName = filterOptions.customer_mobile_to_name?.[value];
+        if (customerName) {
+          updated.customerName = customerName;
+        }
+      } else if (field === "customerName" && value !== "All") {
+        const customerMobile = filterOptions.customer_name_to_mobile?.[value];
+        if (customerMobile) {
+          updated.customerMobile = customerMobile;
+        }
+      }
+      
+      return updated;
+    });
   };
 
   const loadDashboardData = useCallback(async (filterParams?: CampaignDashboardFilters) => {
     // Don't block UI - show mock data immediately, update later
     setError(null);
     
-    // Create abort controller for cancellation
-    const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), 30000); // 30 second timeout
-    
-    // Load data in background without blocking
-    getCampaignDashboard(filterParams)
-      .then((response) => {
-        clearTimeout(timeoutId);
-        // Update data without blocking UI
-        setKpiData(response.kpi);
-        setRScoreData(response.r_score_data);
-        setFScoreData(response.f_score_data);
-        setMScoreData(response.m_score_data);
-        setRValueBucketData(response.r_value_bucket_data);
-        setVisitsData(response.visits_data);
-        setValueData(response.value_data);
-        setSegmentData(response.segment_data);
-        setDaysToReturnBucketData(response.days_to_return_bucket_data);
-        setFiscalYearData(response.fiscal_year_data);
-      })
-      .catch((err) => {
-        clearTimeout(timeoutId);
-        const errorMsg = extractApiErrorMessage(err);
-        setError(errorMsg);
-        console.error("Failed to load dashboard data:", err);
-        // Keep mock data on error - don't block UI
-        if (errorMsg.includes("timeout") || errorMsg.includes("aborted")) {
-          console.warn("Dashboard data request timed out - using mock data");
-        }
-      });
+    setLoading(true);
+
+    // Cancel any in-flight dashboard request to keep the UI responsive
+    dashboardRequestRef.current?.abort();
+    const controller = new AbortController();
+    dashboardRequestRef.current = controller;
+
+    try {
+      const response = await getCampaignDashboard(filterParams, controller.signal);
+      setKpiData(response.kpi);
+      setRScoreData(response.r_score_data);
+      setFScoreData(response.f_score_data);
+      setMScoreData(response.m_score_data);
+      setRValueBucketData(response.r_value_bucket_data);
+      setVisitsData(response.visits_data);
+      setValueData(response.value_data);
+      setSegmentData(response.segment_data);
+      setDaysToReturnBucketData(response.days_to_return_bucket_data);
+      setFiscalYearData(response.fiscal_year_data);
+    } catch (err) {
+      if (controller.signal.aborted) {
+        return;
+      }
+      const errorMsg = extractApiErrorMessage(err, "Failed to load dashboard data");
+      setError(errorMsg);
+      console.error("Failed to load dashboard data:", err);
+      if (errorMsg.includes("timeout") || errorMsg.includes("aborted")) {
+        console.warn("Dashboard data request timed out - using mock data");
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
+    }
   }, []);
 
   const loadFilterOptions = useCallback(async () => {
@@ -272,6 +297,8 @@ export default function CampaignDashboard() {
       setFilterOptions({
         customer_mobiles: [],
         customer_names: [],
+        customer_mobile_to_name: {},
+        customer_name_to_mobile: {},
         r_value_buckets: [],
         f_value_buckets: [],
         m_value_buckets: [],
@@ -282,16 +309,22 @@ export default function CampaignDashboard() {
   }, []);
 
   useEffect(() => {
-    // Show charts immediately with mock data - don't wait for API
-    // This ensures page is interactive immediately
-    setChartsReady(true);
-    
-    // Load data in background (non-blocking) - use setTimeout to defer
-    // This prevents blocking the initial render
+    const idleHandle =
+    typeof window !== "undefined" && typeof window.requestIdleCallback === "function"
+      ? window.requestIdleCallback(() => setChartsReady(true), { timeout: 500 })
+      : window.setTimeout(() => setChartsReady(true), 150);
     setTimeout(() => {
       loadFilterOptions();
       loadDashboardData();
     }, 0);
+    return () => {
+      dashboardRequestRef.current?.abort();
+      if (typeof window !== "undefined" && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleHandle as number);
+      } else {
+        clearTimeout(idleHandle as number);
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty deps - only run on mount
 
@@ -354,7 +387,7 @@ export default function CampaignDashboard() {
       {/* Filters Section */}
       <form className="dashboard-filters filters" onSubmit={handleApplyFilters}>
         <div className="filter-row">
-          <div className="filter-group filter-item">
+          <div className="filter-group filter-item date-field">
             <label>Start Date</label>
             <div className="date-input-wrapper">
               <CalendarIcon />
@@ -365,7 +398,7 @@ export default function CampaignDashboard() {
               />
             </div>
           </div>
-          <div className="filter-group filter-item">
+          <div className="filter-group filter-item date-field">
             <label>End Date</label>
             <div className="date-input-wrapper">
               <CalendarIcon />
@@ -376,49 +409,31 @@ export default function CampaignDashboard() {
               />
             </div>
           </div>
-          <div className="filter-group filter-item">
+          <div className="filter-group filter-item autocomplete-field">
             <label>Customer Mobile No</label>
-            <select
-              className="filter-select"
+            <Autocomplete
               value={filters.customerMobile}
-              onChange={(e) => handleFilterChange("customerMobile", e.target.value)}
+              options={filterOptions.customer_mobiles}
+              onChange={(value) => handleFilterChange("customerMobile", value)}
+              placeholder="Mobile number"
               disabled={filtersLoading}
-            >
-              <option>All</option>
-              {filtersLoading ? (
-                <option>Loading...</option>
-              ) : (
-                filterOptions.customer_mobiles.map((mobile) => (
-                  <option key={mobile} value={mobile}>
-                    {mobile}
-                  </option>
-                ))
-              )}
-            </select>
+              allowAll={true}
+              allLabel="All"
+            />
           </div>
-          <div className="filter-group filter-item">
+          <div className="filter-group filter-item autocomplete-field">
             <label>Customer Name</label>
-            <select
-              className="filter-select"
+            <Autocomplete
               value={filters.customerName}
-              onChange={(e) => handleFilterChange("customerName", e.target.value)}
+              options={filterOptions.customer_names}
+              onChange={(value) => handleFilterChange("customerName", value)}
+              placeholder="Customer name"
               disabled={filtersLoading}
-            >
-              <option>All</option>
-              {filtersLoading ? (
-                <option>Loading...</option>
-              ) : (
-                filterOptions.customer_names.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))
-              )}
-            </select>
+              allowAll={true}
+              allLabel="All"
+            />
           </div>
-        </div>
-        <div className="filter-row">
-          <div className="filter-group filter-item">
+          <div className="filter-group filter-item select-field">
             <label>R Value Bucket</label>
             <select
               className="filter-select"
@@ -438,7 +453,7 @@ export default function CampaignDashboard() {
               )}
             </select>
           </div>
-          <div className="filter-group filter-item">
+          <div className="filter-group filter-item select-field">
             <label>F Value Bucket</label>
             <select
               className="filter-select"
@@ -458,7 +473,7 @@ export default function CampaignDashboard() {
               )}
             </select>
           </div>
-          <div className="filter-group filter-item">
+          <div className="filter-group filter-item select-field">
             <label>M Value Bucket</label>
             <select
               className="filter-select"
@@ -480,7 +495,7 @@ export default function CampaignDashboard() {
           </div>
           <div className="filter-group filter-actions">
             <button type="submit" className="btn-apply" disabled={loading}>
-              {loading ? "Applying..." : "Apply Filter"}
+              {loading ? "Applying..." : "Apply"}
             </button>
           </div>
         </div>
@@ -501,59 +516,29 @@ export default function CampaignDashboard() {
 
       {/* KPI Cards */}
       <div className="kpi-cards metrics">
-        <div className="kpi-card" style={{ borderTopColor: KPI_CARD_COLORS[0] }}>
-          <div className="kpi-icon" style={{ backgroundColor: KPI_CARD_COLORS[0] + "20" }}>
-            ⭐
-          </div>
-          <div className="kpi-content">
-            <div className="kpi-label">Total Customer</div>
-            <div className="kpi-value">{displayKPIData.totalCustomer.toLocaleString()}</div>
-          </div>
+        <div className="metric-card-total">
+          <h4>Total Customer</h4>
+          <p>{displayKPIData.totalCustomer.toLocaleString()}</p>
         </div>
-        <div className="kpi-card" style={{ borderTopColor: KPI_CARD_COLORS[1] }}>
-          <div className="kpi-icon" style={{ backgroundColor: KPI_CARD_COLORS[1] + "20" }}>
-            💰
-          </div>
-          <div className="kpi-content">
-            <div className="kpi-label">Unit Per Transaction</div>
-            <div className="kpi-value">{formatNumber(displayKPIData.unitPerTransaction)}</div>
-          </div>
+        <div className="metric-card-total_profit">
+          <h4>Unit Per Transaction</h4>
+          <p>{formatNumber(displayKPIData.unitPerTransaction)}</p>
         </div>
-        <div className="kpi-card" style={{ borderTopColor: KPI_CARD_COLORS[2] }}>
-          <div className="kpi-icon" style={{ backgroundColor: KPI_CARD_COLORS[2] + "20" }}>
-            💵
-          </div>
-          <div className="kpi-content">
-            <div className="kpi-label">Profit Per Customer</div>
-            <div className="kpi-value">{formatCurrency(displayKPIData.profitPerCustomer)}</div>
-          </div>
+        <div className="metric-card-total_unit">
+          <h4>Profit Per Customer</h4>
+          <p>{formatCurrency(displayKPIData.profitPerCustomer)}</p>
         </div>
-        <div className="kpi-card" style={{ borderTopColor: KPI_CARD_COLORS[3] }}>
-          <div className="kpi-icon" style={{ backgroundColor: KPI_CARD_COLORS[3] + "20" }}>
-            🛒
-          </div>
-          <div className="kpi-content">
-            <div className="kpi-label">Customer Spending</div>
-            <div className="kpi-value">{formatCurrency(displayKPIData.customerSpending)}</div>
-          </div>
+        <div className="metric-card-total_spending">
+          <h4>Customer Spending</h4>
+          <p>{formatCurrency(displayKPIData.customerSpending)}</p>
         </div>
-        <div className="kpi-card" style={{ borderTopColor: KPI_CARD_COLORS[4] }}>
-          <div className="kpi-icon" style={{ backgroundColor: KPI_CARD_COLORS[4] + "20" }}>
-            🔄
-          </div>
-          <div className="kpi-content">
-            <div className="kpi-label">Days to Return</div>
-            <div className="kpi-value">{formatNumber(displayKPIData.daysToReturn)}</div>
-          </div>
+        <div className="metric-card-total_return">
+          <h4>Days to Return</h4>
+          <p>{formatNumber(displayKPIData.daysToReturn)}</p>
         </div>
-        <div className="kpi-card" style={{ borderTopColor: KPI_CARD_COLORS[5] }}>
-          <div className="kpi-icon" style={{ backgroundColor: KPI_CARD_COLORS[5] + "20" }}>
-            🔗
-          </div>
-          <div className="kpi-content">
-            <div className="kpi-label">Retention Rate</div>
-            <div className="kpi-value">{displayKPIData.retentionRate.toFixed(2)}%</div>
-          </div>
+        <div className="metric-card-total_retention">
+          <h4>Retention Rate</h4>
+          <p>{displayKPIData.retentionRate.toFixed(2)}%</p>
         </div>
       </div>
 
@@ -563,25 +548,40 @@ export default function CampaignDashboard() {
           <LazyChart>
             <div className="chart-container">
               <h4>Total Customer by R Score</h4>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
+                  <defs>
+                    {GRADIENTS.map((g) => (
+                      <linearGradient id={`grad-r-${g.id}`} key={`grad-r-${g.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor={g.start} />
+                        <stop offset="100%" stopColor={g.end} />
+                      </linearGradient>
+                    ))}
+                  </defs>
                   <Pie
-                    data={rScoreData}
+                    data={rScoreData as any}
                     cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, count }) => `${name}: ${count}`}
-                    outerRadius={80}
+                    cy="52%"
+                    labelLine={true}
+                    label={({ value }: any) => value}
+                    outerRadius={65}
+                    innerRadius={35}
                     fill="#8884d8"
                     dataKey="value"
                     isAnimationActive={false}
                   >
-                    {rScoreData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === 0 ? COLORS.orange : COLORS.purple} />
+                    {rScoreData.map((_, index) => (
+                      <Cell key={`cell-r-${index}`} fill={`url(#grad-r-grad${(index % GRADIENTS.length) + 1})`} />
                     ))}
                   </Pie>
                   <Tooltip />
-                  <Legend />
+                  <Legend 
+                    layout="horizontal"
+                    align="right"
+                    verticalAlign="bottom"
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', paddingTop: '6px' }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -589,26 +589,40 @@ export default function CampaignDashboard() {
           <LazyChart>
             <div className="chart-container">
               <h4>Total Customer by F Score</h4>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
+                  <defs>
+                    {GRADIENTS.map((g) => (
+                      <linearGradient id={`grad-f-${g.id}`} key={`grad-f-${g.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor={g.start} />
+                        <stop offset="100%" stopColor={g.end} />
+                      </linearGradient>
+                    ))}
+                  </defs>
                   <Pie
-                    data={fScoreData}
+                    data={fScoreData as any}
                     cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, count }) => `${name}: ${count}`}
-                    outerRadius={80}
+                    cy="52%"
+                    labelLine={true}
+                    label={({ value }: any) => value}
+                    outerRadius={65}
+                    innerRadius={35}
                     fill="#8884d8"
                     dataKey="value"
                     isAnimationActive={false}
                   >
-                    {fScoreData.map((entry, index) => {
-                      const colors = [COLORS.red, COLORS.orange, COLORS.yellow, COLORS.teal, COLORS.purple];
-                      return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
-                    })}
+                    {fScoreData.map((_, index) => (
+                      <Cell key={`cell-f-${index}`} fill={`url(#grad-f-grad${(index % GRADIENTS.length) + 1})`} />
+                    ))}
                   </Pie>
                   <Tooltip />
-                  <Legend />
+                  <Legend 
+                    layout="horizontal"
+                    align="right"
+                    verticalAlign="bottom"
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', paddingTop: '6px' }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -616,26 +630,40 @@ export default function CampaignDashboard() {
           <LazyChart>
             <div className="chart-container">
               <h4>Total Customer by M Score</h4>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
+                  <defs>
+                    {GRADIENTS.map((g) => (
+                      <linearGradient id={`grad-m-${g.id}`} key={`grad-m-${g.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor={g.start} />
+                        <stop offset="100%" stopColor={g.end} />
+                      </linearGradient>
+                    ))}
+                  </defs>
                   <Pie
-                    data={mScoreData}
+                    data={mScoreData as any}
                     cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, count }) => `${name}: ${count}`}
-                    outerRadius={80}
+                    cy="52%"
+                    labelLine={true}
+                    label={({ value }: any) => value}
+                    outerRadius={65}
+                    innerRadius={35}
                     fill="#8884d8"
                     dataKey="value"
                     isAnimationActive={false}
                   >
-                    {mScoreData.map((entry, index) => {
-                      const colors = [COLORS.purple, COLORS.yellow, COLORS.teal, COLORS.orange, COLORS.red];
-                      return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
-                    })}
+                    {mScoreData.map((_, index) => (
+                      <Cell key={`cell-m-${index}`} fill={`url(#grad-m-grad${(index % GRADIENTS.length) + 1})`} />
+                    ))}
                   </Pie>
                   <Tooltip />
-                  <Legend />
+                  <Legend 
+                    layout="horizontal"
+                    align="right"
+                    verticalAlign="bottom"
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', paddingTop: '6px' }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -649,14 +677,39 @@ export default function CampaignDashboard() {
           <LazyChart>
             <div className="chart-container">
               <h4>Total Customer by R Value Bucket (Days)</h4>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={rValueBucketData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={rValueBucketData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={100} />
+                  <XAxis 
+                    type="number" 
+                    dataKey="value"
+                    domain={[0, 'dataMax']}
+                    tick={{ fontSize: 9 }}
+                    label={{ 
+                      value: 'Total Customer', 
+                      position: 'bottom', 
+                      offset: 0 
+                    }} 
+                  />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category"
+                    width={80}
+                    tick={{ fontSize: 9 }}
+                    label={{
+                      value: 'R value Bucket (Days)',
+                      angle: -90,
+                      position: 'right',
+                      dx: -90,
+                      dy: 90
+                    }}
+                  />
                   <Tooltip />
-                  <Legend />
-                  <Bar dataKey="value" fill={COLORS.primary} isAnimationActive={false} />
+                  <Bar dataKey="value" isAnimationActive={false}>
+                    {rValueBucketData.map((_, index) => (
+                      <Cell key={`cell-bar-r-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -664,14 +717,35 @@ export default function CampaignDashboard() {
           <LazyChart>
             <div className="chart-container">
               <h4>Total Customer by No. of Visits</h4>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={visitsData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={visitsData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={100} />
+                  <XAxis
+                    type="number"
+                    dataKey="value"
+                    domain={[0, 'dataMax']}
+                    tick={{ fontSize: 9 }}
+                    label={{ value: 'Total Customer', position: 'bottom', offset: 0 }}
+                  />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    width={80}
+                    tick={{ fontSize: 9 }}
+                    label={{ 
+                      value: 'No. of Visits', 
+                      angle: -90, 
+                      position: 'right',
+                      dx: -90,
+                      dy: 50
+                    }}
+                  />
                   <Tooltip />
-                  <Legend />
-                  <Bar dataKey="value" fill={COLORS.accent} isAnimationActive={false} />
+                  <Bar dataKey="value" isAnimationActive={false}>
+                    {visitsData.map((_, index) => (
+                      <Cell key={`cell-bar-v-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -679,14 +753,34 @@ export default function CampaignDashboard() {
           <LazyChart>
             <div className="chart-container">
               <h4>Total Customer by Value</h4>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={valueData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={valueData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={100} />
+                  <XAxis
+                    type="number"
+                    dataKey="value"
+                    domain={[0, 'dataMax']}
+                    tick={{ fontSize: 9 }}
+                    label={{ value: 'Total Customer', position: 'bottom', offset: 0 }}
+                  />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    width={80}
+                    tick={{ fontSize: 9 }}
+                    label={{ 
+                      value: 'Value', 
+                      angle: -90, 
+                      position: 'insideLeft', 
+                      offset: 10 
+                    }}
+                  />
                   <Tooltip />
-                  <Legend />
-                  <Bar dataKey="value" fill={COLORS.purple} isAnimationActive={false} />
+                  <Bar dataKey="value" isAnimationActive={false}>
+                    {valueData.map((_, index) => (
+                      <Cell key={`cell-bar-val-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -700,13 +794,10 @@ export default function CampaignDashboard() {
           <LazyChart>
             <div className="chart-container treemap">
               <h4>Total Customer by Segment</h4>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={220}>
                 <Treemap
-                  width={400}
-                  height={350}
-                  data={segmentData}
+                  data={segmentData as any}
                   dataKey="value"
-                  ratio={4 / 3}
                   stroke="#fff"
                   fill="#8884d8"
                   isAnimationActive={false}
@@ -715,6 +806,11 @@ export default function CampaignDashboard() {
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
+                        const titleCaseName = (data.name || '')
+                          .toLowerCase()
+                          .split(' ')
+                          .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+                          .join(' ');
                         return (
                           <div style={{
                             backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -723,8 +819,8 @@ export default function CampaignDashboard() {
                             borderRadius: '4px',
                             boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                           }}>
-                            <p style={{ margin: 0, fontWeight: 'bold', color: data.fill }}>{data.name}</p>
-                            <p style={{ margin: '4px 0 0 0' }}>Count: {data.value?.toLocaleString()}</p>
+                            <p style={{ margin: 0, fontWeight: 'bold', color: data.fill, fontSize: '12px' }}>{titleCaseName}</p>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#333' }}>Count: {data.value?.toLocaleString()}</p>
                           </div>
                         );
                       }
@@ -733,20 +829,12 @@ export default function CampaignDashboard() {
                   />
                 </Treemap>
               </ResponsiveContainer>
-              <div className="treemap-legend" style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center' }}>
-                {segmentData.map((segment, index) => (
-                  <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div style={{ width: '16px', height: '16px', backgroundColor: segment.fill || '#8884d8', borderRadius: '2px' }}></div>
-                    <span style={{ fontSize: '12px' }}>{segment.name}: {segment.value.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
             </div>
           </LazyChart>
           <LazyChart>
             <div className="chart-container">
               <h4>Current Vs New Customer % (FY)</h4>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={fiscalYearData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="year" />
@@ -783,14 +871,14 @@ export default function CampaignDashboard() {
           <LazyChart>
             <div className="chart-container">
               <h4>Days to Return Bucket</h4>
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={daysToReturnBucketData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <ResponsiveContainer width="100%" height={120}>
+                <BarChart data={daysToReturnBucketData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="count" fill={COLORS.primary} isAnimationActive={false} />
+                  <Bar dataKey="count" fill="#1E8449" isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

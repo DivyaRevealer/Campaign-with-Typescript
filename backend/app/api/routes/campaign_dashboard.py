@@ -45,22 +45,22 @@ def _apply_base_filters(query, filters: dict):
     if customer_name and customer_name != "All" and customer_name.strip():
         query = query.where(InvCrmAnalysis.customer_name == customer_name)
     
-    # R value bucket filter (based on DAYS field) - skip if "All"
+    # R value bucket filter (based on R_VALUE field) - skip if "All"
     r_value_bucket = filters.get("r_value_bucket")
     if r_value_bucket and r_value_bucket != "All":
         bucket = r_value_bucket
         if bucket == "1-200":
-            query = query.where(InvCrmAnalysis.days <= 200)
+            query = query.where(InvCrmAnalysis.r_value <= 200)
         elif bucket == "200-400":
-            query = query.where(and_(InvCrmAnalysis.days > 200, InvCrmAnalysis.days <= 400))
+            query = query.where(and_(InvCrmAnalysis.r_value > 200, InvCrmAnalysis.r_value <= 400))
         elif bucket == "400-600":
-            query = query.where(and_(InvCrmAnalysis.days > 400, InvCrmAnalysis.days <= 600))
+            query = query.where(and_(InvCrmAnalysis.r_value > 400, InvCrmAnalysis.r_value <= 600))
         elif bucket == "600-800":
-            query = query.where(and_(InvCrmAnalysis.days > 600, InvCrmAnalysis.days <= 800))
+            query = query.where(and_(InvCrmAnalysis.r_value > 600, InvCrmAnalysis.r_value <= 800))
         elif bucket == "800-1000":
-            query = query.where(and_(InvCrmAnalysis.days > 800, InvCrmAnalysis.days <= 1000))
+            query = query.where(and_(InvCrmAnalysis.r_value > 800, InvCrmAnalysis.r_value <= 1000))
         elif bucket == ">1000":
-            query = query.where(InvCrmAnalysis.days > 1000)
+            query = query.where(InvCrmAnalysis.r_value > 1000)
     
     # F value bucket filter (based on F_VALUE) - skip if "All"
     f_value_bucket = filters.get("f_value_bucket")
@@ -76,9 +76,9 @@ def _apply_base_filters(query, filters: dict):
     if m_value_bucket and m_value_bucket != "All":
         bucket = m_value_bucket
         if bucket == "1-1000":
-            query = query.where(InvCrmAnalysis.total_sales <= 1000)
+            query = query.where(InvCrmAnalysis.m_value <= 1000)
         elif bucket == "1000-2000":
-            query = query.where(and_(InvCrmAnalysis.total_sales > 1000, InvCrmAnalysis.total_sales <= 2000))
+            query = query.where(and_(InvCrmAnalysis.m_value > 1000, InvCrmAnalysis.m_value <= 2000))
         elif bucket == "2000-3000":
             query = query.where(and_(InvCrmAnalysis.total_sales > 2000, InvCrmAnalysis.total_sales <= 3000))
         elif bucket == "3000-4000":
@@ -233,15 +233,15 @@ async def _get_r_value_bucket_data(
     session: AsyncSession,
     filters: dict,
 ) -> list[ChartDataPoint]:
-    """Get R value bucket distribution based on DAYS field."""
+    """Get R value bucket distribution based on R_VALUE field."""
     
     query = select(
         case(
-            (InvCrmAnalysis.days <= 200, "1-200"),
-            (InvCrmAnalysis.days <= 400, "200-400"),
-            (InvCrmAnalysis.days <= 600, "400-600"),
-            (InvCrmAnalysis.days <= 800, "600-800"),
-            (InvCrmAnalysis.days <= 1000, "800-1000"),
+            (InvCrmAnalysis.r_value <= 200, "1-200"),
+            (InvCrmAnalysis.r_value <= 400, "200-400"),
+            (InvCrmAnalysis.r_value <= 600, "400-600"),
+            (InvCrmAnalysis.r_value <= 800, "600-800"),
+            (InvCrmAnalysis.r_value <= 1000, "800-1000"),
             else_=">1000"
         ).label("bucket"),
         func.count(InvCrmAnalysis.cust_mobileno).label("count")
@@ -285,15 +285,15 @@ async def _get_value_data(
     session: AsyncSession,
     filters: dict,
 ) -> list[ChartDataPoint]:
-    """Get customer value distribution based on TOTAL_SALES."""
+    """Get customer value distribution based on M_VALUE."""
     
     query = select(
         case(
-            (InvCrmAnalysis.total_sales <= 1000, "1-1000"),
-            (InvCrmAnalysis.total_sales <= 2000, "1000-2000"),
-            (InvCrmAnalysis.total_sales <= 3000, "2000-3000"),
-            (InvCrmAnalysis.total_sales <= 4000, "3000-4000"),
-            (InvCrmAnalysis.total_sales <= 5000, "4000-5000"),
+            (InvCrmAnalysis.m_value <= 1000, "1-1000"),
+            (InvCrmAnalysis.m_value <= 2000, "1000-2000"),
+            (InvCrmAnalysis.m_value <= 3000, "2000-3000"),
+            (InvCrmAnalysis.m_value <= 4000, "3000-4000"),
+            (InvCrmAnalysis.m_value <= 5000, "4000-5000"),
             else_=">5000"
         ).label("bucket"),
         func.count(InvCrmAnalysis.cust_mobileno).label("count")
@@ -486,14 +486,14 @@ async def get_campaign_dashboard_filters(
         f_bucket_results = (await session.execute(f_bucket_query)).scalars().all()
         f_value_buckets = sorted([str(b) for b in f_bucket_results if b is not None])
         
-        # Get distinct M value buckets (based on M_VALUE or TOTAL_SALES ranges)
+        # Get distinct M value buckets (based on M_VALUE ranges)
         m_bucket_query = select(
             case(
-                (InvCrmAnalysis.total_sales <= 1000, "1-1000"),
-                (InvCrmAnalysis.total_sales <= 2000, "1000-2000"),
-                (InvCrmAnalysis.total_sales <= 3000, "2000-3000"),
-                (InvCrmAnalysis.total_sales <= 4000, "3000-4000"),
-                (InvCrmAnalysis.total_sales <= 5000, "4000-5000"),
+                (InvCrmAnalysis.m_value <= 1000, "1-1000"),
+                (InvCrmAnalysis.m_value <= 2000, "1000-2000"),
+                (InvCrmAnalysis.m_value <= 3000, "2000-3000"),
+                (InvCrmAnalysis.m_value <= 4000, "3000-4000"),
+                (InvCrmAnalysis.m_value <= 5000, "4000-5000"),
                 else_=">5000"
             ).label("bucket")
         ).distinct()

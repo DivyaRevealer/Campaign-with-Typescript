@@ -17,7 +17,7 @@ from app.api.routes.production_reports import router as production_reports_route
 from app.api.routes.delivery import router as delivery_router
 from app.api.routes.delivery_reports import router as delivery_reports_router
 from app.api.routes.summary_reports import router as summary_reports_router
-from app.api.routes.campaign_dashboard import router as campaign_dashboard_router
+from app.api.routes.campaign_dashboard_optimized import router as campaign_dashboard_router
 from app.api.routes.create_campaign import router as create_campaign_router
 from app.api.routes.template import router as template_router
 from app.core.config import settings
@@ -25,6 +25,7 @@ from app.core.db import get_session
 from app.core.logging import setup_logging
 from app.core.middleware import BodySizeLimitMiddleware, RequestContextLogMiddleware
 from app.core.rate_limit import init_rate_limiter
+from app.core.cache import get_redis_client, close_redis_client
 
 setup_logging()
 
@@ -60,6 +61,27 @@ app.add_middleware(
 )
 
 app.add_middleware(BodySizeLimitMiddleware)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize Redis connection on startup."""
+    if getattr(settings, 'REDIS_ENABLED', True):
+        try:
+            client = await get_redis_client()
+            if client:
+                print("✅ Redis cache initialized - Dashboard caching enabled")
+            # Silently continue without Redis - no warning needed
+            # The API works perfectly fine without Redis (still optimized with indexes)
+        except Exception:
+            # Silently continue without Redis
+            pass
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Close Redis connection on shutdown."""
+    await close_redis_client()
 
 
 @app.get("/api/healthz", tags=["system"], summary="Liveness probe")

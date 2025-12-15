@@ -260,6 +260,8 @@ export interface CampaignDashboardFilters {
 export interface FilterOptions {
   customer_mobiles: string[];
   customer_names: string[];
+  customer_mobile_to_name?: Record<string, string>;
+  customer_name_to_mobile?: Record<string, string>;
   r_value_buckets: string[];
   f_value_buckets: string[];
   m_value_buckets: string[];
@@ -279,7 +281,10 @@ export interface CampaignDashboardOut {
 }
 
 // Campaign Dashboard API Functions
-export const getCampaignDashboard = (filters?: CampaignDashboardFilters): Promise<CampaignDashboardOut> => {
+export const getCampaignDashboard = (
+  filters?: CampaignDashboardFilters,
+  signal?: AbortSignal,
+): Promise<CampaignDashboardOut> => {
   const params = new URLSearchParams();
   if (filters?.start_date) params.append("start_date", filters.start_date);
   if (filters?.end_date) params.append("end_date", filters.end_date);
@@ -291,8 +296,8 @@ export const getCampaignDashboard = (filters?: CampaignDashboardFilters): Promis
   
   const queryString = params.toString();
   const url = `/campaign/dashboard${queryString ? `?${queryString}` : ""}`;
-  // Add timeout of 30 seconds for dashboard data
-  return http.get<CampaignDashboardOut>(url, { timeout: 30000 }).then((r) => r.data);
+  // Add timeout of 10 seconds for dashboard data
+  return http.get<CampaignDashboardOut>(url, { timeout: 10000, signal }).then((r) => r.data);
 };
 
 export const getCampaignDashboardFilters = (): Promise<FilterOptions> => {

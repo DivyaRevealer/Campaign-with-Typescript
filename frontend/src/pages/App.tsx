@@ -46,7 +46,7 @@ export default function App() {
                 </AdminThemeProvider>
               )}
             >
-              <Route index element={<Home />} />
+              <Route index element={<Navigate to="/campaign/dashboard" replace />} />
               <Route path="/clients" element={<ClientList />} />
               <Route path="/clients/new" element={<ClientForm />} />
               <Route path="/clients/:code" element={<ClientForm />} />

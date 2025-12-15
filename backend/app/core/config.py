@@ -61,6 +61,13 @@ class Settings(BaseSettings):
     INNODB_LOCK_WAIT_TIMEOUT_SEC: int = 10
     SELECT_MAX_EXECUTION_TIME_MS: int = 5000
     DB_NOWAIT_LOCKS: bool = False
+    
+    # Redis Cache Configuration (optional - dashboard works without Redis)
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_PASSWORD: str | None = None
+    REDIS_ENABLED: bool = True  # Set to False to disable Redis caching
     # Maximum allowed upload size for user-supplied files.
     MAX_UPLOAD_BYTES: int = 5 * 1024 * 1024  # 5 MB
     ENABLE_FILE_SCAN: bool = True
