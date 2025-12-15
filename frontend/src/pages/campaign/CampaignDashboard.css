@@ -412,9 +412,9 @@
 }
 
 .chart-container .recharts-pie-label-text {
-  font-size: 10px;
+  font-size: 11px;
   fill: #333;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .chart-container .recharts-pie-label-line {
@@ -424,32 +424,14 @@
 
 /* Bar chart labels */
 .chart-container .recharts-cartesian-axis-tick text {
-  font-size: 10px;
-  fill: #333;
-  font-weight: 500;
+  font-size: 11px;
+  fill: #666;
 }
 
 /* Legend text */
 .chart-container .recharts-legend-item-text {
-  font-size: 10px !important;
-  color: #333 !important;
-  text-transform: capitalize !important;
-  font-weight: 500 !important;
-}
-
-/* X-axis and Y-axis labels */
-.chart-container .recharts-cartesian-axis-label text {
-  font-size: 10px;
-  fill: #333;
-  font-weight: 500;
-}
-
-/* Treemap text */
-.chart-container .recharts-treemap text {
   font-size: 11px !important;
-  text-transform: capitalize !important;
-  fill: #ffffff !important;
-  font-weight: 600 !important;
+  color: #666 !important;
 }
 
 .chart-container-wide {
