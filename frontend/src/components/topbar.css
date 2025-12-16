@@ -4,7 +4,7 @@
   justify-content: space-between;
   padding: 3px 28px;
   border-bottom: 1px solid var(--admin-panel-border);
-  background: linear-gradient(135deg, #0f6cbd 0%, #115ea3 100%);
+  background: #2D3748;
   backdrop-filter: blur(14px);
   position: sticky;
   top: 0;

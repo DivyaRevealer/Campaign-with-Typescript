@@ -103,7 +103,7 @@
 .form-field select {
   padding: 3px 6px;
   border: 1px solid var(--admin-input-border);
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 13px;
   line-height: 1.5715;
   transition: all 0.3s;
@@ -252,7 +252,7 @@
   height: 32px;
   padding: 3px 6px;
   border: 1px solid var(--admin-input-border);
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 13px;
   line-height: 1.5715;
   box-shadow: 0 2px 6px rgba(15,23,42,0.12);
@@ -267,7 +267,7 @@
   height: 32px;
   padding: 3px 6px;
   border: 1px solid var(--admin-input-border);
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 13px;
   line-height: 1.5715;
   background: var(--admin-input-bg);
@@ -291,7 +291,7 @@
 .multi-select {
   position: relative;
   border: 1px solid var(--admin-input-border);
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 4px 11px;
   background: var(--admin-input-bg);
   cursor: pointer;
@@ -327,7 +327,7 @@
   position: fixed;
   background: var(--admin-card-bg);
   border: 1px solid var(--admin-card-border);
-  border-radius: 4px;
+  border-radius: 8px;
   box-shadow: var(--admin-page-shadow);
   z-index: 10000;
   max-height: 256px;
@@ -427,7 +427,7 @@
   background: var(--admin-accent-gradient);
   color: var(--admin-accent-text);
   border: 1px solid var(--admin-accent-border);
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
   transition: all 0.3s;
@@ -453,7 +453,7 @@
 .message-banner {
   padding: 12px 16px;
   margin-bottom: 12px;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 13px;
   display: flex;
   align-items: center;

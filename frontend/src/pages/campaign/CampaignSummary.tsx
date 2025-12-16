@@ -9,6 +9,7 @@ export default function CampaignSummary() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [searchText, setSearchText] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -42,6 +43,18 @@ export default function CampaignSummary() {
     }
   };
 
+  const filteredCampaigns = campaigns.filter((campaign) =>
+    [
+      campaign.name,
+      campaign.based_on,
+      formatDate(campaign.start_date),
+      formatDate(campaign.end_date),
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchText.toLowerCase())
+  );
+
   return (
     <div className="campaign-summary-page">
       <div className="campaign-summary-header">
@@ -63,15 +76,27 @@ export default function CampaignSummary() {
         </div>
       )}
 
+      <div className="campaign-summary-filters">
+        <input
+          type="text"
+          className="search-input"
+          placeholder="Search campaigns..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+        />
+      </div>
+
       <div className="campaign-summary-card">
         {loading ? (
           <div className="loading-state">Loading campaigns...</div>
-        ) : campaigns.length === 0 ? (
+        ) : filteredCampaigns.length === 0 ? (
           <div className="empty-state">
-            <p>No campaigns found.</p>
-            <Link to="/campaign/new" className="btn-primary">
-              Create Your First Campaign
-            </Link>
+            <p>{searchText ? "No campaigns found matching your search." : "No campaigns found."}</p>
+            {!searchText && (
+              <Link to="/campaign/new" className="btn-primary">
+                Create Your First Campaign
+              </Link>
+            )}
           </div>
         ) : (
           <div className="admin-table-wrapper">
@@ -87,7 +112,7 @@ export default function CampaignSummary() {
                 </tr>
               </thead>
               <tbody>
-                {campaigns.map((campaign, index) => (
+                {filteredCampaigns.map((campaign, index) => (
                   <tr
                     key={campaign.id}
                     className={index % 2 === 0 ? "row-even" : "row-odd"}

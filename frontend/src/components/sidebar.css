@@ -21,13 +21,13 @@
   flex: 0 0 260px;
   background: var(--admin-sidebar-bg);
   color: var(--admin-sidebar-header-text);
-  padding: 24px 20px 24px;
+  padding: 0;
   position: sticky;
   top: 0;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 0;
   border-right: 1px solid var(--admin-sidebar-border);
   box-shadow: var(--admin-sidebar-shadow);
   backdrop-filter: blur(18px);
@@ -37,11 +37,108 @@
     padding 0.3s ease;
 }
 
+.ims-sidebar-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 24px;
+  min-height: 48px;
+  height: auto;
+  background: var(--admin-card-bg);
+  border-bottom: 1px solid var(--admin-sidebar-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  position: relative;
+}
+
+.ims-sidebar-logo-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  transition: gap 0.3s ease;
+}
+
+.ims-sidebar.collapsed .ims-sidebar-logo-section {
+  gap: 0;
+}
+
+.ims-sidebar-logo {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  object-position: left center;
+  flex-shrink: 0;
+  filter: brightness(0.85) contrast(1.1);
+  transition: filter 0.2s ease, background 0.2s ease;
+  opacity: 1;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+/* Ensure logo visibility in dark mode - add light background and enhance brightness */
+body[data-admin-theme="dark"] .ims-sidebar-logo {
+  filter: brightness(3) contrast(1.5) saturate(1.3);
+  background: rgba(255, 255, 255, 0.15);
+  padding: 3px;
+  opacity: 1;
+}
+
+.ims-sidebar-brand-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ims-sidebar-brand {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--admin-sidebar-header-text);
+  white-space: nowrap;
+  opacity: 1;
+  max-width: 200px;
+  overflow: hidden;
+  transition: opacity 0.2s ease, max-width 0.3s ease, margin 0.3s ease;
+}
+
+.ims-sidebar-subtitle {
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: #888;
+  white-space: nowrap;
+  text-transform: lowercase;
+  letter-spacing: 0.3px;
+}
+
+body[data-admin-theme="dark"] .ims-sidebar-subtitle {
+  color: #aaa;
+}
+
+.ims-sidebar.collapsed .ims-sidebar-brand-group {
+  display: none;
+}
+
+.ims-sidebar.collapsed .ims-sidebar-header {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 12px;
+  height: auto;
+  min-height: auto;
+  gap: 12px;
+}
+
+.ims-sidebar.collapsed .ims-sidebar-logo-section {
+  flex: 0;
+  gap: 0;
+}
+
 .ims-sidebar-collapse-toggle {
-  position: absolute;
-  top: 50%;
-  right: -18px;
-  transform: translateY(-50%);
+  position: relative;
   width: 40px;
   height: 40px;
   display: inline-flex;
@@ -49,18 +146,18 @@
   justify-content: center;
   border-radius: 50%;
   border: 0;
-  background: var(--admin-sidebar-toggle-bg);
-  color: var(--admin-sidebar-toggle-text);
+  background: transparent;
+  color: var(--admin-sidebar-header-text);
   cursor: pointer;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
-  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.3s ease;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   z-index: 2;
+  flex-shrink: 0;
+  margin-right: -8px;
 }
 
 .ims-sidebar-collapse-toggle:hover {
-  background: var(--admin-sidebar-toggle-hover-bg);
-  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.28);
-  transform: translateY(-50%) scale(1.05);
+  background: var(--admin-nav-hover-bg);
+  transform: scale(1.05);
 }
 
 .ims-sidebar-collapse-toggle:focus-visible {
@@ -73,22 +170,11 @@
   height: 18px;
 }
 
-.ims-sidebar-collapse-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ims-sidebar.collapsed .ims-sidebar-collapse-toggle {
-  right: -14px;
-}
-
 .ims-sidebar.collapsed {
   width: 80px;
   min-width: 80px;
   max-width: 80px;
   flex: 0 0 80px;
-  padding: 24px 12px;
 }
 
 .ims-side-nav {
@@ -97,11 +183,12 @@
   flex-direction: column;
   gap: 14px;
   overflow-y: auto;
-  padding-right: 6px;
+  padding: 18px 20px;
+  padding-right: 26px;
 }
 
 .ims-sidebar.collapsed .ims-side-nav {
-  padding-right: 0;
+  padding: 18px 12px;
   align-items: center;
 }
 
@@ -245,14 +332,16 @@
 .ims-side-footer {
   margin-top: auto;
   position: relative;
-  padding-top: 12px;
+  padding: 12px 20px 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  border-top: 1px solid var(--admin-sidebar-border);
 }
 
 .ims-sidebar.collapsed .ims-side-footer {
   align-items: center;
+  padding: 12px 12px 24px;
 }
 
 .btn-logout {

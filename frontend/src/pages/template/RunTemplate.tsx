@@ -240,7 +240,17 @@ export default function RunTemplate() {
 
           {campaignDetails && showNext && (
             <div className="campaign-details-grid">
-              {/* Left Card: Campaign Info */}
+              {/* Customers Shortlisted */}
+              {hasValue(campaignDetails?.shortlisted_count) && (
+                <div className="detail-card">
+                  <h3>Customers Shortlisted</h3>
+                  <div className="detail-value">
+                    {Number(campaignDetails.shortlisted_count).toLocaleString("en-IN")}
+                  </div>
+                </div>
+              )}
+
+              {/* Campaign Info */}
               {(hasValue(campaignDetails?.name) ||
                 (hasValue(campaignDetails?.start_date) && hasValue(campaignDetails?.end_date)) ||
                 hasValue(campaignDetails?.based_on)) && (
@@ -265,9 +275,183 @@ export default function RunTemplate() {
                 </div>
               )}
 
-              {/* Right Card: Template and Broadcasting */}
+              {/* Location Info */}
+              {(hasValue(campaignDetails?.branch) || hasValue(campaignDetails?.city) || hasValue(campaignDetails?.state)) && (
+                <div className="detail-card">
+                  <h3>Location Info</h3>
+                  {hasValue(campaignDetails?.branch) && (
+                    <p>
+                      <strong>Branch:</strong> {Array.isArray(campaignDetails.branch) 
+                        ? campaignDetails.branch.join(", ") 
+                        : typeof campaignDetails.branch === 'object' 
+                          ? Object.values(campaignDetails.branch).join(", ")
+                          : campaignDetails.branch}
+                    </p>
+                  )}
+                  {hasValue(campaignDetails?.city) && (
+                    <p>
+                      <strong>City:</strong> {Array.isArray(campaignDetails.city) 
+                        ? campaignDetails.city.join(", ") 
+                        : typeof campaignDetails.city === 'object' 
+                          ? Object.values(campaignDetails.city).join(", ")
+                          : campaignDetails.city}
+                    </p>
+                  )}
+                  {hasValue(campaignDetails?.state) && (
+                    <p>
+                      <strong>State:</strong> {Array.isArray(campaignDetails.state) 
+                        ? campaignDetails.state.join(", ") 
+                        : typeof campaignDetails.state === 'object' 
+                          ? Object.values(campaignDetails.state).join(", ")
+                          : campaignDetails.state}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Targeting Criteria */}
+              {(hasValue(campaignDetails?.recency_min) || hasValue(campaignDetails?.frequency_min) || hasValue(campaignDetails?.monetary_min)) && (
+                <div className="detail-card">
+                  <h3>Targeting Criteria</h3>
+                  {hasValue(campaignDetails?.recency_min) && (
+                    <p>
+                      <strong>Recency:</strong> {campaignDetails.recency_op || ""} {campaignDetails.recency_min}
+                      {campaignDetails.recency_max && ` - ${campaignDetails.recency_max}`}
+                    </p>
+                  )}
+                  {hasValue(campaignDetails?.frequency_min) && (
+                    <p>
+                      <strong>Frequency:</strong> {campaignDetails.frequency_op || ""} {campaignDetails.frequency_min}
+                      {campaignDetails.frequency_max && ` - ${campaignDetails.frequency_max}`}
+                    </p>
+                  )}
+                  {hasValue(campaignDetails?.monetary_min) && (
+                    <p>
+                      <strong>Monetary:</strong> {campaignDetails.monetary_op || ""} {campaignDetails.monetary_min}
+                      {campaignDetails.monetary_max && ` - ${campaignDetails.monetary_max}`}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* RFM Scores */}
+              {(hasValue(campaignDetails?.r_score) || hasValue(campaignDetails?.f_score) || hasValue(campaignDetails?.m_score)) && (
+                <div className="detail-card">
+                  <h3>RFM Scores</h3>
+                  {hasValue(campaignDetails?.r_score) && (
+                    <p>
+                      <strong>R-Score:</strong> {Array.isArray(campaignDetails.r_score) 
+                        ? campaignDetails.r_score.join(", ") 
+                        : typeof campaignDetails.r_score === 'object' 
+                          ? Object.values(campaignDetails.r_score).join(", ")
+                          : campaignDetails.r_score}
+                    </p>
+                  )}
+                  {hasValue(campaignDetails?.f_score) && (
+                    <p>
+                      <strong>F-Score:</strong> {Array.isArray(campaignDetails.f_score) 
+                        ? campaignDetails.f_score.join(", ") 
+                        : typeof campaignDetails.f_score === 'object' 
+                          ? Object.values(campaignDetails.f_score).join(", ")
+                          : campaignDetails.f_score}
+                    </p>
+                  )}
+                  {hasValue(campaignDetails?.m_score) && (
+                    <p>
+                      <strong>M-Score:</strong> {Array.isArray(campaignDetails.m_score) 
+                        ? campaignDetails.m_score.join(", ") 
+                        : typeof campaignDetails.m_score === 'object' 
+                          ? Object.values(campaignDetails.m_score).join(", ")
+                          : campaignDetails.m_score}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Purchase & Category */}
+              {(hasValue(campaignDetails?.purchase_type) || hasValue(campaignDetails?.purchase_brand) || hasValue(campaignDetails?.section)) && (
+                <div className="detail-card">
+                  <h3>Purchase & Category</h3>
+                  {hasValue(campaignDetails?.purchase_type) && (
+                    <p>
+                      <strong>Purchase Type:</strong> {campaignDetails.purchase_type}
+                    </p>
+                  )}
+                  {hasValue(campaignDetails?.purchase_brand) && (
+                    <p>
+                      <strong>Brand:</strong> {Array.isArray(campaignDetails.purchase_brand) 
+                        ? campaignDetails.purchase_brand.join(", ") 
+                        : typeof campaignDetails.purchase_brand === 'object' 
+                          ? Object.values(campaignDetails.purchase_brand).join(", ")
+                          : campaignDetails.purchase_brand}
+                    </p>
+                  )}
+                  {hasValue(campaignDetails?.section) && (
+                    <p>
+                      <strong>Section:</strong> {Array.isArray(campaignDetails.section) 
+                        ? campaignDetails.section.join(", ") 
+                        : typeof campaignDetails.section === 'object' 
+                          ? Object.values(campaignDetails.section).join(", ")
+                          : campaignDetails.section}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Product & Model */}
+              {(hasValue(campaignDetails?.product) || hasValue(campaignDetails?.model) || hasValue(campaignDetails?.item)) && (
+                <div className="detail-card">
+                  <h3>Product & Model</h3>
+                  {hasValue(campaignDetails?.product) && (
+                    <p>
+                      <strong>Product:</strong> {Array.isArray(campaignDetails.product) 
+                        ? campaignDetails.product.join(", ") 
+                        : typeof campaignDetails.product === 'object' 
+                          ? Object.values(campaignDetails.product).join(", ")
+                          : campaignDetails.product}
+                    </p>
+                  )}
+                  {hasValue(campaignDetails?.model) && (
+                    <p>
+                      <strong>Model:</strong> {Array.isArray(campaignDetails.model) 
+                        ? campaignDetails.model.join(", ") 
+                        : typeof campaignDetails.model === 'object' 
+                          ? Object.values(campaignDetails.model).join(", ")
+                          : campaignDetails.model}
+                    </p>
+                  )}
+                  {hasValue(campaignDetails?.item) && (
+                    <p>
+                      <strong>Item:</strong> {Array.isArray(campaignDetails.item) 
+                        ? campaignDetails.item.join(", ") 
+                        : typeof campaignDetails.item === 'object' 
+                          ? Object.values(campaignDetails.item).join(", ")
+                          : campaignDetails.item}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Value & Birthday */}
+              {(hasValue(campaignDetails?.value_threshold) || hasValue(campaignDetails?.birthday_start) || hasValue(campaignDetails?.birthday_end)) && (
+                <div className="detail-card">
+                  <h3>Value & Birthday</h3>
+                  {hasValue(campaignDetails?.value_threshold) && (
+                    <p>
+                      <strong>Value Threshold:</strong> {campaignDetails.value_threshold}
+                    </p>
+                  )}
+                  {(hasValue(campaignDetails?.birthday_start) || hasValue(campaignDetails?.birthday_end)) && (
+                    <p>
+                      <strong>Birthday Range:</strong> {campaignDetails.birthday_start || ""} → {campaignDetails.birthday_end || ""}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Template and Broadcasting */}
               <div className="detail-card template-broadcast-card">
-                <h3>Template and Broadcasting Mode</h3>
+                <h3>Template Name</h3>
                 <div className="form-field">
                   <label htmlFor="template">Template Name *</label>
                   <select

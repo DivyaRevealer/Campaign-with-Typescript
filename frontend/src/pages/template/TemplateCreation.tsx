@@ -254,36 +254,49 @@ export default function TemplateCreation() {
       ) : filteredTemplates.length === 0 ? (
         <div className="loading">No templates found. Create your first template using the button above.</div>
       ) : (
-        <div className="template-grid">
-          {filteredTemplates.map((t) => (
-            <div key={t.id || t.name} className="template-card">
-              <div className="template-card-header">
-                <h3>{t.name}</h3>
-              </div>
-              <div className="template-card-body">
-                <div className="template-tags">
-                  <span className="tag">{t.templateType || "N/A"}</span>
-                  <span
-                    className="tag status"
-                    style={{
-                      backgroundColor: statusColors[t.templateCreateStatus || ""] || "#6b7280",
-                    }}
-                  >
-                    {t.templateCreateStatus || "N/A"}
-                  </span>
-                </div>
-              </div>
-              <div className="template-card-actions">
-                <button
-                  className="btn-icon"
-                  onClick={() => handleSyncTemplate(t.name)}
-                  title="Sync Template"
-                >
-                  🔄
-                </button>
-              </div>
-            </div>
-          ))}
+        <div className="admin-table-wrapper">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th>Sync Template</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTemplates.map((t, index) => (
+                <tr key={t.id || t.name} className={index % 2 === 0 ? "row-even" : "row-odd"}>
+                  <td>
+                    <strong>{t.name}</strong>
+                  </td>
+                  <td>
+                    <strong>{t.templateType || t.category || "N/A"}</strong>
+                  </td>
+                  <td>
+                    <span
+                      className="tag status"
+                      style={{
+                        backgroundColor: statusColors[t.templateCreateStatus || t.Status || ""] || "#6b7280",
+                        color: "#fff",
+                      }}
+                    >
+                      {t.templateCreateStatus || t.Status || "N/A"}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      className="btn-icon"
+                      onClick={() => handleSyncTemplate(t.name)}
+                      title="Sync Template"
+                    >
+                      🔄
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 

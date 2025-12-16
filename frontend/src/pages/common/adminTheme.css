@@ -584,6 +584,26 @@ body[data-admin-theme="dark"] {
   box-sizing: border-box;
 }
 
+/* Global rounded edges for all form components across all screens */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+select,
+textarea {
+  border-radius: 8px !important;
+}
+
+button:not(.icon-button):not(.btn-icon) {
+  border-radius: 8px !important;
+}
+
 .drawer-content input:focus,
 .drawer-content select:focus {
   outline: none;
@@ -770,4 +790,24 @@ body[data-admin-theme="dark"] {
   .form-field--code input {
     max-width: none;
   }
+}
+
+/* Global rounded edges for all form components across all screens */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+select,
+textarea {
+  border-radius: 8px !important;
+}
+
+button:not(.icon-button):not(.btn-icon):not(.login-button) {
+  border-radius: 8px !important;
 }

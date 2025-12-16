@@ -45,15 +45,28 @@ export default function Sidebar() {
 
   return (
     <aside className={`ims-sidebar ${collapsed ? "collapsed" : ""}`}>
-      <button
-        type="button"
-        className="ims-sidebar-collapse-toggle"
-        onClick={toggleSidebar}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        <FaBars />
-      </button>
+      <div className="ims-sidebar-header">
+        <div className="ims-sidebar-logo-section">
+          <img 
+            src="/revealer-logo.png" 
+            alt="Revealer Logo" 
+            className="ims-sidebar-logo"
+          />
+          <div className="ims-sidebar-brand-group">
+            <span className="ims-sidebar-brand">Revealer</span>
+            {!collapsed && <span className="ims-sidebar-subtitle">reviving insights for thinkers</span>}
+          </div>
+        </div>
+        <button
+          type="button"
+          className="ims-sidebar-collapse-toggle"
+          onClick={toggleSidebar}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <FaBars />
+        </button>
+      </div>
       <div className="ims-side-nav">
         {/* Master menu - hidden */}
         {false && (

@@ -96,7 +96,7 @@
 .filter-select {
   padding: 3px 6px;
   border: 1px solid var(--admin-input-border, #e2e8f0);
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 13px;
   background: var(--admin-input-bg, #fff);
   color: var(--admin-input-text, #1a1a1a);
@@ -150,7 +150,7 @@
   background: var(--admin-accent-gradient, #14b8a6);
   color: var(--admin-accent-text, white);
   border: 1px solid var(--admin-accent-border, transparent);
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -469,7 +469,7 @@
   justify-content: center;
   align-items: center;
   padding: 12px;
-  border-radius: 4px;
+  border-radius: 8px;
   color: white;
   text-align: center;
   min-height: 80px;

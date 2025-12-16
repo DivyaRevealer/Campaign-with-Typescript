@@ -22,6 +22,27 @@
   font-size: 14px;
 }
 
+.campaign-summary-filters {
+  margin-bottom: 24px;
+}
+
+.search-input {
+  width: 100%;
+  max-width: 400px;
+  padding: 8px 12px;
+  background: var(--admin-input-bg);
+  border: 1px solid var(--admin-input-border);
+  border-radius: 20px;
+  color: var(--admin-input-text);
+  font-size: 14px;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--admin-focus-border);
+  box-shadow: 0 0 0 2px var(--admin-focus-ring);
+}
+
 .campaign-summary-card {
   background: var(--admin-card-bg);
   border: 1px solid var(--admin-card-border);
@@ -56,7 +77,7 @@
   padding: 6px 16px;
   background: var(--admin-accent-gradient);
   border: 1px solid var(--admin-accent-border);
-  border-radius: 4px;
+  border-radius: 8px;
   color: var(--admin-accent-text);
   font-size: 14px;
   font-weight: 500;
@@ -75,7 +96,7 @@
 .message-banner {
   padding: 12px 16px;
   margin-bottom: 16px;
-  border-radius: 4px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -106,30 +127,48 @@
 
 .admin-table-wrapper {
   overflow-x: auto;
+  background: var(--admin-card-bg);
+  border: 1px solid var(--admin-card-border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--admin-card-inset);
 }
 
 .admin-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  border-radius: 16px;
+  overflow: hidden;
 }
 
 .admin-table thead {
-  background: var(--admin-table-header-bg, var(--admin-card-bg));
+  background: #3a4a5c;
 }
 
 .admin-table th {
   padding: 12px;
   text-align: left;
   font-weight: 600;
-  color: var(--admin-label-text, var(--admin-page-text));
-  border-bottom: 2px solid var(--admin-card-border);
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+.admin-table th:first-child {
+  border-top-left-radius: 16px;
+}
+
+.admin-table th:last-child {
+  border-top-right-radius: 16px;
 }
 
 .admin-table td {
   padding: 12px;
-  border-bottom: 1px solid var(--admin-card-border);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
   color: var(--admin-page-text);
+  background: transparent;
 }
 
 .admin-table tbody tr.row-even {
@@ -137,7 +176,7 @@
 }
 
 .admin-table tbody tr.row-odd {
-  background: var(--admin-table-row-odd-bg, transparent);
+  background: var(--admin-table-row-odd-bg, rgba(255, 255, 255, 0.02));
 }
 
 .admin-table tbody tr:hover {
@@ -146,6 +185,14 @@
 
 .admin-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+.admin-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 16px;
+}
+
+.admin-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 16px;
 }
 
 .admin-table td strong {

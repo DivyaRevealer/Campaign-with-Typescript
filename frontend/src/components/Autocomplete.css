@@ -15,7 +15,7 @@
   border: 1px solid #e2e8f0;
   background: #fff;
   color: #1a1a1a;
-  border-radius: 4px;
+  border-radius: 8px;
   outline: none;
   box-sizing: border-box;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -86,12 +86,12 @@
 
 .autocomplete-list::-webkit-scrollbar-track {
   background: #f8fafc;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .autocomplete-list::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.5);
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .autocomplete-list::-webkit-scrollbar-thumb:hover {
