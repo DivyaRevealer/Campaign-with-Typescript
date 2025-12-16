@@ -2,7 +2,7 @@
 .campaign-dashboard,
 .rfm-dashboard {
   padding: 20px;
-  background-color: #f0f2f5;
+  background-color: var(--admin-page-bg, #f0f2f5);
   min-height: 100vh;
   box-sizing: border-box;
 }
@@ -15,12 +15,12 @@
   font-size: 28px;
   font-weight: 600;
   margin: 0 0 8px 0;
-  color: #1a1a1a;
+  color: var(--admin-page-text, #1a1a1a);
 }
 
 .dashboard-header p {
   margin: 0;
-  color: #666;
+  color: var(--admin-muted-text, #666);
   font-size: 14px;
 }
 
@@ -32,7 +32,8 @@
   gap: 16px;
   align-items: center;
   margin-bottom: 24px;
-  background: #ffffff;
+  background: var(--admin-card-bg, #ffffff);
+  border: 1px solid var(--admin-card-border, #e2e8f0);
   border-radius: 8px;
   padding: 20px 20px 20px 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -82,7 +83,7 @@
 .filter-item label {
   font-size: 13px;
   font-weight: 600;
-  color: #555;
+  color: var(--admin-label-text, #555);
   margin-bottom: 2px;
   height: 20px;
   line-height: 20px;
@@ -94,11 +95,11 @@
 .filter-group select,
 .filter-select {
   padding: 3px 6px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--admin-input-border, #e2e8f0);
   border-radius: 4px;
   font-size: 13px;
-  background: #fff;
-  color: #1a1a1a;
+  background: var(--admin-input-bg, #fff);
+  color: var(--admin-input-text, #1a1a1a);
   transition: border-color 0.2s;
   height: 32px;
   box-sizing: border-box;
@@ -146,9 +147,9 @@
 
 .btn-apply {
   padding: 3px 16px;
-  background: #14b8a6;
-  color: white;
-  border: none;
+  background: var(--admin-accent-gradient, #14b8a6);
+  color: var(--admin-accent-text, white);
+  border: 1px solid var(--admin-accent-border, transparent);
   border-radius: 4px;
   font-size: 13px;
   font-weight: 500;
@@ -160,10 +161,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: var(--admin-accent-shadow, none);
 }
 
 .btn-apply:hover:not(:disabled) {
-  background: #0d9488;
+  background: var(--admin-accent-gradient-strong, #0d9488);
+  box-shadow: var(--admin-accent-shadow-hover, none);
 }
 
 .btn-apply:disabled {
@@ -205,7 +208,7 @@
   margin: 0;
   font-size: 1.5rem;
   font-weight: bold;
-  color: #111;
+  color: var(--admin-page-text, #111);
 }
 
 /* Special Metric Cards with Background Images (matching reference project) */
@@ -292,7 +295,8 @@
 }
 
 .metric-card1 {
-  background: #ffffff;
+  background: var(--admin-card-bg, #ffffff);
+  border: 1px solid var(--admin-card-border, transparent);
   padding: 6px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -312,7 +316,7 @@
   margin: 0;
   font-size: 1rem;
   font-weight: bold;
-  color: #111;
+  color: var(--admin-page-text, #111);
   padding: 8px;
 }
 
@@ -346,7 +350,7 @@
 
 .kpi-label {
   font-size: 13px;
-  color: #666;
+  color: var(--admin-muted-text, #666);
   margin-bottom: 4px;
   font-weight: 500;
 }
@@ -354,7 +358,7 @@
 .kpi-value {
   font-size: 24px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--admin-page-text, #1a1a1a);
   word-break: break-word;
 }
 
@@ -374,7 +378,8 @@
 }
 
 .chart-container {
-  background: #ffffff;
+  background: var(--admin-card-bg, #ffffff);
+  border: 1px solid var(--admin-card-border, transparent);
   padding: 8px;
   border-radius: 8px;
   font-family: 'Inter', Arial, sans-serif;
@@ -391,7 +396,7 @@
 .chart-container h4 {
   margin: 0 0 12px;
   font-size: 12px;
-  color: #333;
+  color: var(--admin-page-text, #333);
   text-align: center;
   font-weight: 600;
   line-height: 1.2;
@@ -413,25 +418,25 @@
 
 .chart-container .recharts-pie-label-text {
   font-size: 11px;
-  fill: #333;
+  fill: var(--admin-page-text, #333);
   font-weight: 700;
 }
 
 .chart-container .recharts-pie-label-line {
-  stroke: #666;
+  stroke: var(--admin-muted-text, #666);
   stroke-width: 1.5;
 }
 
 /* Bar chart labels */
 .chart-container .recharts-cartesian-axis-tick text {
   font-size: 11px;
-  fill: #666;
+  fill: var(--admin-muted-text, #666);
 }
 
 /* Legend text */
 .chart-container .recharts-legend-item-text {
   font-size: 11px !important;
-  color: #666 !important;
+  color: var(--admin-muted-text, #666) !important;
 }
 
 .chart-container-wide {

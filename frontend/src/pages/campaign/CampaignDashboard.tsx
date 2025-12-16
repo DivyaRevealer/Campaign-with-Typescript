@@ -14,6 +14,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  LabelList,
 } from "recharts";
 import { 
   getCampaignDashboard,
@@ -62,18 +63,7 @@ const GRADIENTS = [
   { id: "grad6", start: "#1fa2ff", end: "#12d8fa" }
 ];
 
-type SegmentTreemapNode = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  name: string;
-  value?: number;
-  fill: string;
-};
-
-
-const renderSegmentTreemapContent = (props: SegmentTreemapNode) => {
+const renderSegmentTreemapContent = (props: any) => {
   const { x, y, width, height, name, value, fill } = props;
   const centerX = x + width / 2;
   const centerY = y + height / 2;
@@ -418,16 +408,10 @@ export default function CampaignDashboard() {
     retentionRate: kpiData.retention_rate,
   }), [kpiData]);
 
-  // Memoize container styles to avoid creating new object on every render
-  const containerStyle = useMemo(() => ({
-    minHeight: "100vh",
-    backgroundColor: "#f0f2f5",
-    padding: "20px",
-    color: "#1a1a1a"
-  }), []);
+  // Removed inline styles - using CSS classes with theme variables instead
 
   return (
-    <div className="campaign-dashboard rfm-dashboard" style={containerStyle}>
+    <div className="campaign-dashboard rfm-dashboard">
       <div className="dashboard-header">
         <h1>Campaign Dashboard</h1>
         <p>Customer Analytics & Insights</p>
@@ -728,7 +712,6 @@ export default function CampaignDashboard() {
               <h4>Total Customer by R Value Bucket (Days)</h4>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={rValueBucketData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
                   <XAxis 
                     type="number" 
                     dataKey="value"
@@ -768,7 +751,6 @@ export default function CampaignDashboard() {
               <h4>Total Customer by No. of Visits</h4>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={visitsData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     type="number"
                     dataKey="value"
@@ -804,7 +786,6 @@ export default function CampaignDashboard() {
               <h4>Total Customer by Value</h4>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={valueData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     type="number"
                     dataKey="value"
@@ -907,7 +888,7 @@ export default function CampaignDashboard() {
                     yAxisId="right"
                     type="monotone"
                     dataKey="old_customer_percent"
-                    stroke="#1a1a1a"
+                    stroke="#0f6cbd"
                     strokeWidth={2}
                     name="Old Customer %"
                     dot={{ r: 5 }}
@@ -921,14 +902,19 @@ export default function CampaignDashboard() {
           <LazyChart>
             <div className="chart-container">
               <h4>Days to Return Bucket</h4>
-              <ResponsiveContainer width="100%" height={120}>
-                <BarChart data={daysToReturnBucketData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
+              <ResponsiveContainer width="100%" height={190}>
+                <BarChart data={daysToReturnBucketData} barSize={18} margin={{ top: 10, right: 12, left: 12, bottom: 8 }}>
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip />
-                  <Legend />
-                  <Bar dataKey="count" fill="#1E8449" isAnimationActive={false} />
+                  <Bar dataKey="count" fill="#1E8449" isAnimationActive={false}>
+                    <LabelList
+                      dataKey="count"
+                      position="top"
+                      formatter={(v: any) => (typeof v === "number" ? v.toLocaleString() : v ?? "")}
+                      style={{ fontSize: 10, fill: "#1a1a1a", fontWeight: 600 }}
+                    />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>

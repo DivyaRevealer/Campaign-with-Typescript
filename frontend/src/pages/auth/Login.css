@@ -19,6 +19,7 @@
     radial-gradient(circle at 78% 78%, rgba(15, 108, 189, 0.22), transparent 62%);
   background-blend-mode: screen, normal;
   z-index: 0;
+  pointer-events: none;
 }
 
 .login-page::after {
@@ -29,6 +30,7 @@
     radial-gradient(circle at 84% 78%, rgba(15, 108, 189, 0.18), transparent 60%);
   mix-blend-mode: screen;
   z-index: 0;
+  pointer-events: none;
 }
 
 .login-card {
@@ -43,6 +45,7 @@
   gap: 22px;
   color: #000000;
   backdrop-filter: blur(14px);
+  z-index: 1;
 }
 
 /* Override for dark theme to use medium grey */
