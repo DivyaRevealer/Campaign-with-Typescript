@@ -659,7 +659,8 @@ async def send_whatsapp_text(
     }
 
     try:
-        resp = requests.post(url, json=payload_data, headers=headers, timeout=30)
+        timeout = settings.WHATSAPP_API_TIMEOUT
+        resp = requests.post(url, json=payload_data, headers=headers, timeout=timeout)
         resp.raise_for_status()
         response_data = resp.json()
         
@@ -697,6 +698,27 @@ async def send_whatsapp_text(
             "template_name": template_name,
             "recipients_count": len(cleaned_numbers)
         }
+    except requests.exceptions.ConnectTimeout as e:
+        error_msg = f"Connection to WhatsApp API server timed out after {timeout} seconds. The server may be unreachable or experiencing high load. Please try again later."
+        logger.error(f"WhatsApp API connection timeout: {e}")
+        raise HTTPException(
+            status_code=504,
+            detail=error_msg,
+        )
+    except requests.exceptions.Timeout as e:
+        error_msg = f"Request to WhatsApp API timed out after {timeout} seconds. The server may be slow or experiencing high load. Please try again later."
+        logger.error(f"WhatsApp API request timeout: {e}")
+        raise HTTPException(
+            status_code=504,
+            detail=error_msg,
+        )
+    except requests.exceptions.ConnectionError as e:
+        error_msg = f"Failed to connect to WhatsApp API server. Please check your internet connection and ensure the API server is accessible."
+        logger.error(f"WhatsApp API connection error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=error_msg,
+        )
     except requests.HTTPError as e:
         error_detail = "Unknown error"
         if "resp" in locals():
@@ -850,11 +872,39 @@ async def send_whatsapp_image(
     }
 
     try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=30)
+        timeout = settings.WHATSAPP_API_TIMEOUT
+        resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
         resp.raise_for_status()
         return resp.json()
+    except requests.exceptions.ConnectTimeout as e:
+        error_msg = f"Connection to WhatsApp API server timed out after {timeout} seconds. The server may be unreachable or experiencing high load. Please try again later."
+        logger.error(f"WhatsApp API connection timeout: {e}")
+        raise HTTPException(
+            status_code=504,
+            detail=error_msg,
+        )
+    except requests.exceptions.Timeout as e:
+        error_msg = f"Request to WhatsApp API timed out after {timeout} seconds. The server may be slow or experiencing high load. Please try again later."
+        logger.error(f"WhatsApp API request timeout: {e}")
+        raise HTTPException(
+            status_code=504,
+            detail=error_msg,
+        )
+    except requests.exceptions.ConnectionError as e:
+        error_msg = f"Failed to connect to WhatsApp API server. Please check your internet connection and ensure the API server is accessible."
+        logger.error(f"WhatsApp API connection error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=error_msg,
+        )
     except requests.HTTPError:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    except Exception as e:
+        logger.error(f"Unexpected error sending WhatsApp image: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send WhatsApp image: {str(e)}",
+        )
 
 
 @router.post("/sendWatsAppVideo")
@@ -994,8 +1044,36 @@ async def send_whatsapp_video(
     }
 
     try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=30)
+        timeout = settings.WHATSAPP_API_TIMEOUT
+        resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
         resp.raise_for_status()
         return resp.json()
+    except requests.exceptions.ConnectTimeout as e:
+        error_msg = f"Connection to WhatsApp API server timed out after {timeout} seconds. The server may be unreachable or experiencing high load. Please try again later."
+        logger.error(f"WhatsApp API connection timeout: {e}")
+        raise HTTPException(
+            status_code=504,
+            detail=error_msg,
+        )
+    except requests.exceptions.Timeout as e:
+        error_msg = f"Request to WhatsApp API timed out after {timeout} seconds. The server may be slow or experiencing high load. Please try again later."
+        logger.error(f"WhatsApp API request timeout: {e}")
+        raise HTTPException(
+            status_code=504,
+            detail=error_msg,
+        )
+    except requests.exceptions.ConnectionError as e:
+        error_msg = f"Failed to connect to WhatsApp API server. Please check your internet connection and ensure the API server is accessible."
+        logger.error(f"WhatsApp API connection error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=error_msg,
+        )
     except requests.HTTPError:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    except Exception as e:
+        logger.error(f"Unexpected error sending WhatsApp video: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send WhatsApp video: {str(e)}",
+        )

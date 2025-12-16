@@ -738,7 +738,7 @@ export default function CampaignDashboard() {
             <div className="chart-container">
               <h4>Total Customer by Recency Score</h4>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={rValueBucketData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                <BarChart data={rValueBucketData} layout="vertical" margin={{ top: 5, right: 10, left: 30, bottom: 5 }}>
                   <XAxis 
                     type="number" 
                     dataKey="value"
@@ -753,14 +753,14 @@ export default function CampaignDashboard() {
                   <YAxis 
                     dataKey="name" 
                     type="category"
-                    width={80}
+                    width={100}
                     tick={{ fontSize: 9 }}
                     label={{
                       value: 'Recency Score',
                       angle: -90,
-                      position: 'right',
-                      dx: -90,
-                      dy: 90
+                      position: 'insideLeft',
+                      offset: -5,
+                      style: { textAnchor: 'middle' }
                     }}
                   />
                   <Tooltip />
@@ -777,7 +777,7 @@ export default function CampaignDashboard() {
             <div className="chart-container">
               <h4>Total Customer by Frequency Score</h4>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={visitsData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                <BarChart data={visitsData} layout="vertical" margin={{ top: 5, right: 10, left: 30, bottom: 5 }}>
                   <XAxis
                     type="number"
                     dataKey="value"
@@ -788,14 +788,14 @@ export default function CampaignDashboard() {
                   <YAxis
                     dataKey="name"
                     type="category"
-                    width={80}
+                    width={100}
                     tick={{ fontSize: 9 }}
                     label={{ 
                       value: 'Frequency Score', 
                       angle: -90, 
-                      position: 'right',
-                      dx: -90,
-                      dy: 50
+                      position: 'insideLeft',
+                      offset: -5,
+                      style: { textAnchor: 'middle' }
                     }}
                   />
                   <Tooltip />
@@ -812,7 +812,7 @@ export default function CampaignDashboard() {
             <div className="chart-container">
               <h4>Total Customer by Monetary Score</h4>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={valueData} layout="vertical" margin={{ top: 5, right: 10, left: 20, bottom: 5 }}>
+                <BarChart data={valueData} layout="vertical" margin={{ top: 5, right: 10, left: 30, bottom: 5 }}>
                   <XAxis
                     type="number"
                     dataKey="value"
@@ -823,14 +823,14 @@ export default function CampaignDashboard() {
                   <YAxis
                     dataKey="name"
                     type="category"
-                    width={80}
+                    width={100}
                     tick={{ fontSize: 9 }}
                     label={{ 
                       value: 'Monetary Score', 
                       angle: -90, 
-                      position: 'right',
-                      dx: -90,
-                      dy: 50
+                      position: 'insideLeft',
+                      offset: -5,
+                      style: { textAnchor: 'middle' }
                     }}
                   />
                   <Tooltip />

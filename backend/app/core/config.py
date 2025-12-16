@@ -85,6 +85,7 @@ class Settings(BaseSettings):
     WBOX_CHANNEL_NUMBER: str | None = Field(default=None, description="WhatsApp channel number")
     API_KEY: str | None = Field(default=None, description="WhatsApp API key (alternative to WBOX_TOKEN)")
     CHANNEL_NUMBER: str | None = Field(default=None, description="WhatsApp channel number (alternative to WBOX_CHANNEL_NUMBER)")
+    WHATSAPP_API_TIMEOUT: int = Field(default=60, description="WhatsApp API request timeout in seconds (connect + read)")
     
     @property
     def template_api_key(self) -> str | None:
