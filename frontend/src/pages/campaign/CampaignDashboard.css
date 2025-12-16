@@ -221,8 +221,8 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: center;
-  text-align: center;
+  align-items: flex-start;
+  text-align: left;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -231,35 +231,36 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   height: 100px;
   color: #fff;
+  position: relative;
 }
 
 .metric-card-total {
-  background: url('/images/tile_background.png') no-repeat center center;
+  background: url('/images/tile_background.png') no-repeat right center;
   background-size: cover;
 }
 
 .metric-card-total_retention {
-  background: url('/images/tile_retention.png') no-repeat center center;
+  background: url('/images/tile_retention.png') no-repeat right center;
   background-size: cover;
 }
 
 .metric-card-total_return {
-  background: url('/images/tile_return.png') no-repeat center center;
+  background: url('/images/tile_return.png') no-repeat right center;
   background-size: cover;
 }
 
 .metric-card-total_spending {
-  background: url('/images/tile_spending.png') no-repeat center center;
+  background: url('/images/tile_spending.png') no-repeat right center;
   background-size: cover;
 }
 
 .metric-card-total_unit {
-  background: url('/images/tile_unit.png') no-repeat center center;
+  background: url('/images/tile_unit.png') no-repeat right center;
   background-size: cover;
 }
 
 .metric-card-total_profit {
-  background: url('/images/tile_profit.png') no-repeat center center;
+  background: url('/images/tile_profit.png') no-repeat right center;
   background-size: cover;
 }
 

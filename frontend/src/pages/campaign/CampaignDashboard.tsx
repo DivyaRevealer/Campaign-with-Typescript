@@ -467,7 +467,7 @@ export default function CampaignDashboard() {
             />
           </div>
           <div className="filter-group filter-item select-field">
-            <label>R Value Bucket</label>
+            <label>R Score</label>
             <select
               className="filter-select"
               value={filters.rValueBucket}
@@ -478,16 +478,25 @@ export default function CampaignDashboard() {
               {filtersLoading ? (
                 <option>Loading...</option>
               ) : (
-                filterOptions.r_value_buckets.map((bucket) => (
-                  <option key={bucket} value={bucket}>
-                    {bucket}
-                  </option>
-                ))
+                filterOptions.r_value_buckets.map((bucket) => {
+                  const rScoreLabels: Record<string, string> = {
+                    "1": "1 - Least Recent",
+                    "2": "2 - Low Recency",
+                    "3": "3 - Moderate Recency",
+                    "4": "4 - Recent Purchase",
+                    "5": "5 - Bought Most Recently",
+                  };
+                  return (
+                    <option key={bucket} value={bucket}>
+                      {rScoreLabels[bucket] || bucket}
+                    </option>
+                  );
+                })
               )}
             </select>
           </div>
           <div className="filter-group filter-item select-field">
-            <label>F Value Bucket</label>
+            <label>F Score</label>
             <select
               className="filter-select"
               value={filters.fValueBucket}
@@ -498,16 +507,25 @@ export default function CampaignDashboard() {
               {filtersLoading ? (
                 <option>Loading...</option>
               ) : (
-                filterOptions.f_value_buckets.map((bucket) => (
-                  <option key={bucket} value={bucket}>
-                    {bucket}
-                  </option>
-                ))
+                filterOptions.f_value_buckets.map((bucket) => {
+                  const fScoreLabels: Record<string, string> = {
+                    "1": "1 - Least Frequent",
+                    "2": "2 - Low Frequency",
+                    "3": "3 - Moderate Frequency",
+                    "4": "4 - Frequent",
+                    "5": "5 - Most Frequent",
+                  };
+                  return (
+                    <option key={bucket} value={bucket}>
+                      {fScoreLabels[bucket] || bucket}
+                    </option>
+                  );
+                })
               )}
             </select>
           </div>
           <div className="filter-group filter-item select-field">
-            <label>M Value Bucket</label>
+            <label>M Score</label>
             <select
               className="filter-select"
               value={filters.mValueBucket}
@@ -518,11 +536,20 @@ export default function CampaignDashboard() {
               {filtersLoading ? (
                 <option>Loading...</option>
               ) : (
-                filterOptions.m_value_buckets.map((bucket) => (
-                  <option key={bucket} value={bucket}>
-                    {bucket}
-                  </option>
-                ))
+                filterOptions.m_value_buckets.map((bucket) => {
+                  const mScoreLabels: Record<string, string> = {
+                    "1": "1 - Lowest Value",
+                    "2": "2 - Low Value",
+                    "3": "3 - Moderate Value",
+                    "4": "4 - High Value",
+                    "5": "5 - Highest Value",
+                  };
+                  return (
+                    <option key={bucket} value={bucket}>
+                      {mScoreLabels[bucket] || bucket}
+                    </option>
+                  );
+                })
               )}
             </select>
           </div>
@@ -562,7 +589,7 @@ export default function CampaignDashboard() {
           <p>{formatCurrency(displayKPIData.profitPerCustomer)}</p>
         </div>
         <div className="metric-card-total_spending">
-          <h4>Customer Spending</h4>
+          <h4>Avg Customer Spend</h4>
           <p>{formatCurrency(displayKPIData.customerSpending)}</p>
         </div>
         <div className="metric-card-total_return">
@@ -709,7 +736,7 @@ export default function CampaignDashboard() {
         <div className="charts-row charts">
           <LazyChart>
             <div className="chart-container">
-              <h4>Total Customer by R Value Bucket (Days)</h4>
+              <h4>Total Customer by Recency Score</h4>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={rValueBucketData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                   <XAxis 
@@ -729,7 +756,7 @@ export default function CampaignDashboard() {
                     width={80}
                     tick={{ fontSize: 9 }}
                     label={{
-                      value: 'R value Bucket (Days)',
+                      value: 'Recency Score',
                       angle: -90,
                       position: 'right',
                       dx: -90,
@@ -748,7 +775,7 @@ export default function CampaignDashboard() {
           </LazyChart>
           <LazyChart>
             <div className="chart-container">
-              <h4>Total Customer by No. of Visits</h4>
+              <h4>Total Customer by Frequency Score</h4>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={visitsData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                   <XAxis
@@ -764,7 +791,7 @@ export default function CampaignDashboard() {
                     width={80}
                     tick={{ fontSize: 9 }}
                     label={{ 
-                      value: 'No. of Visits', 
+                      value: 'Frequency Score', 
                       angle: -90, 
                       position: 'right',
                       dx: -90,
@@ -783,9 +810,9 @@ export default function CampaignDashboard() {
           </LazyChart>
           <LazyChart>
             <div className="chart-container">
-              <h4>Total Customer by Value</h4>
+              <h4>Total Customer by Monetary Score</h4>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={valueData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                <BarChart data={valueData} layout="vertical" margin={{ top: 5, right: 10, left: 20, bottom: 5 }}>
                   <XAxis
                     type="number"
                     dataKey="value"
@@ -799,10 +826,11 @@ export default function CampaignDashboard() {
                     width={80}
                     tick={{ fontSize: 9 }}
                     label={{ 
-                      value: 'Value', 
+                      value: 'Monetary Score', 
                       angle: -90, 
-                      position: 'insideLeft', 
-                      offset: 10 
+                      position: 'right',
+                      dx: -90,
+                      dy: 50
                     }}
                   />
                   <Tooltip />

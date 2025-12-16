@@ -45,48 +45,32 @@ def _apply_base_filters(query, filters: dict):
     if customer_name and customer_name != "All" and customer_name.strip():
         query = query.where(InvCrmAnalysis.customer_name == customer_name)
     
-    # R value bucket filter (based on R_VALUE field) - skip if "All"
+    # R value bucket filter - use indexed R_SCORE (score 1-5)
     r_value_bucket = filters.get("r_value_bucket")
     if r_value_bucket and r_value_bucket != "All":
-        bucket = r_value_bucket
-        if bucket == "1-200":
-            query = query.where(InvCrmAnalysis.r_value <= 200)
-        elif bucket == "200-400":
-            query = query.where(and_(InvCrmAnalysis.r_value > 200, InvCrmAnalysis.r_value <= 400))
-        elif bucket == "400-600":
-            query = query.where(and_(InvCrmAnalysis.r_value > 400, InvCrmAnalysis.r_value <= 600))
-        elif bucket == "600-800":
-            query = query.where(and_(InvCrmAnalysis.r_value > 600, InvCrmAnalysis.r_value <= 800))
-        elif bucket == "800-1000":
-            query = query.where(and_(InvCrmAnalysis.r_value > 800, InvCrmAnalysis.r_value <= 1000))
-        elif bucket == ">1000":
-            query = query.where(InvCrmAnalysis.r_value > 1000)
+        try:
+            r_score = int(r_value_bucket)
+            query = query.where(InvCrmAnalysis.r_score == r_score)
+        except (ValueError, TypeError):
+            pass
     
-    # F value bucket filter (based on F_VALUE) - skip if "All"
+    # F value bucket filter - use indexed F_SCORE (score 1-5)
     f_value_bucket = filters.get("f_value_bucket")
     if f_value_bucket and f_value_bucket != "All":
         try:
-            f_value = int(f_value_bucket)
-            query = query.where(InvCrmAnalysis.f_value == f_value)
+            f_score = int(f_value_bucket)
+            query = query.where(InvCrmAnalysis.f_score == f_score)
         except (ValueError, TypeError):
-            pass  # Invalid value, skip filter
+            pass
     
-    # M value bucket filter (based on TOTAL_SALES) - skip if "All"
+    # M value bucket filter - use indexed M_SCORE (score 1-5)
     m_value_bucket = filters.get("m_value_bucket")
     if m_value_bucket and m_value_bucket != "All":
-        bucket = m_value_bucket
-        if bucket == "1-1000":
-            query = query.where(InvCrmAnalysis.m_value <= 1000)
-        elif bucket == "1000-2000":
-            query = query.where(and_(InvCrmAnalysis.m_value > 1000, InvCrmAnalysis.m_value <= 2000))
-        elif bucket == "2000-3000":
-            query = query.where(and_(InvCrmAnalysis.total_sales > 2000, InvCrmAnalysis.total_sales <= 3000))
-        elif bucket == "3000-4000":
-            query = query.where(and_(InvCrmAnalysis.total_sales > 3000, InvCrmAnalysis.total_sales <= 4000))
-        elif bucket == "4000-5000":
-            query = query.where(and_(InvCrmAnalysis.total_sales > 4000, InvCrmAnalysis.total_sales <= 5000))
-        elif bucket == ">5000":
-            query = query.where(InvCrmAnalysis.total_sales > 5000)
+        try:
+            m_score = int(m_value_bucket)
+            query = query.where(InvCrmAnalysis.m_score == m_score)
+        except (ValueError, TypeError):
+            pass
     
     return query
 
@@ -233,28 +217,38 @@ async def _get_r_value_bucket_data(
     session: AsyncSession,
     filters: dict,
 ) -> list[ChartDataPoint]:
-    """Get R value bucket distribution based on R_VALUE field."""
+    """Get recency score distribution based on R_SCORE (score 1-5)."""
     
     query = select(
-        case(
-            (InvCrmAnalysis.r_value <= 200, "1-200"),
-            (InvCrmAnalysis.r_value <= 400, "200-400"),
-            (InvCrmAnalysis.r_value <= 600, "400-600"),
-            (InvCrmAnalysis.r_value <= 800, "600-800"),
-            (InvCrmAnalysis.r_value <= 1000, "800-1000"),
-            else_=">1000"
-        ).label("bucket"),
+        InvCrmAnalysis.r_score,
         func.count(InvCrmAnalysis.cust_mobileno).label("count")
     )
     
     # Apply filters
     query = _apply_base_filters(query, filters)
-    query = query.group_by("bucket")
+    query = query.group_by(InvCrmAnalysis.r_score).order_by(InvCrmAnalysis.r_score)
     
     results = (await session.execute(query)).all()
+    
+    score_labels = {
+        1: "Least Recent",
+        2: "Low Recency",
+        3: "Moderate Recency",
+        4: "Recent Purchase",
+        5: "Bought Most Recently",
+    }
+    
+    # Create a dictionary from results for quick lookup
+    result_dict = {r.r_score: float(r.count) for r in results}
+    
+    # Always return all 5 scores, with 0 for scores that don't exist
     return [
-        ChartDataPoint(name=r.bucket, value=float(r.count))
-        for r in results
+        ChartDataPoint(
+            name=score_labels.get(score, f"Score {score}"),
+            value=result_dict.get(score, 0.0),
+            count=result_dict.get(score, 0.0)
+        )
+        for score in range(1, 6)
     ]
 
 
@@ -262,21 +256,33 @@ async def _get_visits_data(
     session: AsyncSession,
     filters: dict,
 ) -> list[ChartDataPoint]:
-    """Get customer visits distribution based on F_VALUE (frequency value)."""
+    """Get frequency score distribution based on F_SCORE (frequency score 1-5)."""
     
     query = select(
-        InvCrmAnalysis.f_value,
+        InvCrmAnalysis.f_score,
         func.count(InvCrmAnalysis.cust_mobileno).label("count")
     )
     
     # Apply filters
     query = _apply_base_filters(query, filters)
-    query = query.group_by(InvCrmAnalysis.f_value).order_by(InvCrmAnalysis.f_value)
+    query = query.group_by(InvCrmAnalysis.f_score).order_by(InvCrmAnalysis.f_score)
     
     results = (await session.execute(query)).all()
     
+    score_labels = {
+        1: "Least Frequent",
+        2: "Low Frequency",
+        3: "Moderate Frequency",
+        4: "Frequent",
+        5: "Most Frequent",
+    }
+    
     return [
-        ChartDataPoint(name=str(r.f_value), value=float(r.count))
+        ChartDataPoint(
+            name=score_labels.get(r.f_score, f"Score {r.f_score}"),
+            value=float(r.count),
+            count=float(r.count)
+        )
         for r in results
     ]
 
@@ -285,28 +291,33 @@ async def _get_value_data(
     session: AsyncSession,
     filters: dict,
 ) -> list[ChartDataPoint]:
-    """Get customer value distribution based on M_VALUE."""
+    """Get monetary score distribution based on M_SCORE (monetary score 1-5)."""
     
     query = select(
-        case(
-            (InvCrmAnalysis.m_value <= 1000, "1-1000"),
-            (InvCrmAnalysis.m_value <= 2000, "1000-2000"),
-            (InvCrmAnalysis.m_value <= 3000, "2000-3000"),
-            (InvCrmAnalysis.m_value <= 4000, "3000-4000"),
-            (InvCrmAnalysis.m_value <= 5000, "4000-5000"),
-            else_=">5000"
-        ).label("bucket"),
+        InvCrmAnalysis.m_score,
         func.count(InvCrmAnalysis.cust_mobileno).label("count")
     )
     
     # Apply filters
     query = _apply_base_filters(query, filters)
-    query = query.group_by("bucket")
+    query = query.group_by(InvCrmAnalysis.m_score).order_by(InvCrmAnalysis.m_score)
     
     results = (await session.execute(query)).all()
     
+    score_labels = {
+        1: "Lowest Value",
+        2: "Low Value",
+        3: "Moderate Value",
+        4: "High Value",
+        5: "Highest Value",
+    }
+    
     return [
-        ChartDataPoint(name=r.bucket, value=float(r.count))
+        ChartDataPoint(
+            name=score_labels.get(r.m_score, f"Score {r.m_score}"),
+            value=float(r.count),
+            count=float(r.count)
+        )
         for r in results
     ]
 
@@ -467,38 +478,11 @@ async def get_campaign_dashboard_filters(
         name_results = (await session.execute(name_query)).scalars().all()
         customer_names = [str(n).strip() for n in name_results if n and str(n).strip()]
         
-        # Get distinct R value buckets (based on DAYS field)
-        r_bucket_query = select(
-            case(
-                (InvCrmAnalysis.days <= 200, "1-200"),
-                (InvCrmAnalysis.days <= 400, "200-400"),
-                (InvCrmAnalysis.days <= 600, "400-600"),
-                (InvCrmAnalysis.days <= 800, "600-800"),
-                (InvCrmAnalysis.days <= 1000, "800-1000"),
-                else_=">1000"
-            ).label("bucket")
-        ).distinct()
-        r_bucket_results = (await session.execute(r_bucket_query)).scalars().all()
-        r_value_buckets = sorted([str(b) for b in r_bucket_results if b])
-        
-        # Get distinct F value buckets (based on F_VALUE)
-        f_bucket_query = select(InvCrmAnalysis.f_value).distinct()
-        f_bucket_results = (await session.execute(f_bucket_query)).scalars().all()
-        f_value_buckets = sorted([str(b) for b in f_bucket_results if b is not None])
-        
-        # Get distinct M value buckets (based on M_VALUE ranges)
-        m_bucket_query = select(
-            case(
-                (InvCrmAnalysis.m_value <= 1000, "1-1000"),
-                (InvCrmAnalysis.m_value <= 2000, "1000-2000"),
-                (InvCrmAnalysis.m_value <= 3000, "2000-3000"),
-                (InvCrmAnalysis.m_value <= 4000, "3000-4000"),
-                (InvCrmAnalysis.m_value <= 5000, "4000-5000"),
-                else_=">5000"
-            ).label("bucket")
-        ).distinct()
-        m_bucket_results = (await session.execute(m_bucket_query)).scalars().all()
-        m_value_buckets = sorted([str(b) for b in m_bucket_results if b])
+        # Predefined score values (1-5 for all RFM scores)
+        # Always return all possible scores, regardless of what's in the database
+        r_value_buckets = ["1", "2", "3", "4", "5"]  # R score values
+        f_value_buckets = ["1", "2", "3", "4", "5"]  # F score values
+        m_value_buckets = ["1", "2", "3", "4", "5"]  # M score values
         
         return FilterOptions(
             customer_mobiles=customer_mobiles,
