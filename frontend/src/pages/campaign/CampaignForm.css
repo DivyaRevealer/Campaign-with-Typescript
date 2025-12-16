@@ -189,10 +189,11 @@
   cursor: pointer;
   position: relative;
   appearance: none;
-  background: var(--admin-secondary-bg);
-  border: 1px solid var(--admin-secondary-border);
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
   border-radius: 10px;
   transition: all 0.3s;
+  flex-shrink: 0;
 }
 
 .switch-group input[type="checkbox"]:checked {

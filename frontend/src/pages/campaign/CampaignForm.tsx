@@ -778,6 +778,153 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
     );
   };
 
+  // Validation function
+  const validateForm = (): string | null => {
+    // Campaign name validation
+    if (!form.name || !form.name.trim()) {
+      return "Campaign name is required";
+    }
+
+    // Date range validation
+    if (!form.campaignPeriod || !form.campaignPeriod[0] || !form.campaignPeriod[1]) {
+      return "Campaign start and end dates are required";
+    }
+
+    const [startDate, endDate] = form.campaignPeriod;
+    if (!startDate || !endDate) {
+      return "Campaign start and end dates are required";
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return "Invalid date format. Please select valid dates";
+    }
+
+    if (start >= end) {
+      return "Start date must be before end date";
+    }
+
+    // Customer Base mode validation - at least one filter required
+    if (form.basedOn === "Customer Base") {
+      const hasRfmFilters = 
+        form.recencyOp || 
+        form.frequencyOp || 
+        form.monetaryOp ||
+        (form.rScore && form.rScore.length > 0) ||
+        (form.fScore && form.fScore.length > 0) ||
+        (form.mScore && form.mScore.length > 0) ||
+        (form.rfmSegment && form.rfmSegment.length > 0);
+
+      const hasGeoFilters = 
+        (form.branch && form.branch.length > 0) ||
+        (form.city && form.city.length > 0) ||
+        (form.state && form.state.length > 0);
+
+      const hasDateFilters = 
+        (form.birthdayRange && form.birthdayRange[0] && form.birthdayRange[1]) ||
+        (form.anniversaryRange && form.anniversaryRange[0] && form.anniversaryRange[1]);
+
+      const hasPurchaseFilters = 
+        form.purchaseType?.anyPurchase || 
+        form.purchaseType?.recentPurchase ||
+        (form.purchaseBrand && form.purchaseBrand.length > 0) ||
+        (form.section && form.section.length > 0) ||
+        (form.product && form.product.length > 0) ||
+        (form.model && form.model.length > 0) ||
+        (form.item && form.item.length > 0) ||
+        form.valueThreshold !== undefined;
+
+      if (!hasRfmFilters && !hasGeoFilters && !hasDateFilters && !hasPurchaseFilters) {
+        return "Please select at least one filter for Customer Base campaigns (RFM, Geography, Dates, or Purchase filters)";
+      }
+
+      // Validate "between" operations
+      if (form.recencyOp === "between") {
+        if (form.recencyMin === undefined || form.recencyMax === undefined) {
+          return "Both min and max values are required for Recency 'between' operation";
+        }
+        if (form.recencyMin >= form.recencyMax) {
+          return "Recency min value must be less than max value";
+        }
+      }
+
+      if (form.frequencyOp === "between") {
+        if (form.frequencyMin === undefined || form.frequencyMax === undefined) {
+          return "Both min and max values are required for Frequency 'between' operation";
+        }
+        if (form.frequencyMin >= form.frequencyMax) {
+          return "Frequency min value must be less than max value";
+        }
+      }
+
+      if (form.monetaryOp === "between") {
+        if (form.monetaryMin === undefined || form.monetaryMax === undefined) {
+          return "Both min and max values are required for Monetary 'between' operation";
+        }
+        if (form.monetaryMin >= form.monetaryMax) {
+          return "Monetary min value must be less than max value";
+        }
+      }
+
+      // Validate RFM segmented mode
+      if (form.rfmMode?.segmented) {
+        if (!form.rfmSegment || form.rfmSegment.length === 0) {
+          return "RFM segments must be selected when RFM mode is 'Segmented'";
+        }
+      }
+
+      // Validate birthday range if provided
+      if (form.birthdayRange && form.birthdayRange[0] && form.birthdayRange[1]) {
+        const bdayStart = new Date(form.birthdayRange[0]);
+        const bdayEnd = new Date(form.birthdayRange[1]);
+        if (bdayStart >= bdayEnd) {
+          return "Birthday start date must be before end date";
+        }
+      }
+
+      // Validate anniversary range if provided
+      if (form.anniversaryRange && form.anniversaryRange[0] && form.anniversaryRange[1]) {
+        const annivStart = new Date(form.anniversaryRange[0]);
+        const annivEnd = new Date(form.anniversaryRange[1]);
+        if (annivStart >= annivEnd) {
+          return "Anniversary start date must be before end date";
+        }
+      }
+    }
+
+    // Upload mode validation - file should be uploaded for new campaigns
+    // Check both form.uploadFile and uploadFile state (they should be in sync)
+    const currentUploadFile = form.uploadFile || uploadFile;
+    if (form.basedOn === "upload" && !id && !currentUploadFile) {
+      return "Please upload a contacts file for upload-based campaigns";
+    }
+
+    // File validation if file is provided
+    if (currentUploadFile) {
+      // Validate file type
+      const validExtensions = ['.xlsx', '.xls'];
+      const fileExtension = currentUploadFile.name.toLowerCase().slice(currentUploadFile.name.lastIndexOf('.'));
+      if (!validExtensions.includes(fileExtension)) {
+        return "Please upload an Excel file (.xlsx or .xls only)";
+      }
+
+      // Validate file size (10MB limit)
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (currentUploadFile.size > maxSize) {
+        return "File size must be less than 10MB";
+      }
+
+      // Validate file is not empty
+      if (currentUploadFile.size === 0) {
+        return "File cannot be empty";
+      }
+    }
+
+    return null; // Validation passed
+  };
+
   // Build payload for API (matching reference logic)
   const buildPayload = (): CampaignCreate => {
     const [startMoment, endMoment] = form.campaignPeriod || ["", ""];
@@ -844,6 +991,13 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
   };
 
   const handleCheckAndCreate = async () => {
+    // Validate form before checking counts
+    const validationError = validateForm();
+    if (validationError) {
+      setErrorMsg(validationError);
+      return;
+    }
+
     try {
       const payload: CampaignCountRequest = {
         name: form.name,
@@ -899,6 +1053,13 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
   };
 
   const handleSubmit = async () => {
+    // Validate form before submission
+    const validationError = validateForm();
+    if (validationError) {
+      setErrorMsg(validationError);
+      return;
+    }
+
     setLoading(true);
     setErrorMsg("");
 
@@ -1613,10 +1774,49 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
               <div style={{ marginTop: 4 }}>
                 <input
                   type="file"
-                  accept=".xlsx,.xls,.csv"
+                  accept=".xlsx,.xls"
                   onChange={(e) => {
                     const file = e.target.files?.[0] || null;
+                    if (!file) {
+                      setUploadFile(null);
+                      setForm({ ...form, uploadFile: null });
+                      return;
+                    }
+
+                    // Validate file type
+                    const validExtensions = ['.xlsx', '.xls'];
+                    const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+                    if (!validExtensions.includes(fileExtension)) {
+                      setErrorMsg("Please upload an Excel file (.xlsx or .xls only)");
+                      e.target.value = ''; // Clear input
+                      setUploadFile(null);
+                      setForm({ ...form, uploadFile: null });
+                      return;
+                    }
+
+                    // Validate file size (10MB limit)
+                    const maxSize = 10 * 1024 * 1024; // 10MB
+                    if (file.size > maxSize) {
+                      setErrorMsg("File size must be less than 10MB");
+                      e.target.value = '';
+                      setUploadFile(null);
+                      setForm({ ...form, uploadFile: null });
+                      return;
+                    }
+
+                    // Validate file is not empty
+                    if (file.size === 0) {
+                      setErrorMsg("File cannot be empty");
+                      e.target.value = '';
+                      setUploadFile(null);
+                      setForm({ ...form, uploadFile: null });
+                      return;
+                    }
+
+                    // File is valid
                     setUploadFile(file);
+                    setForm({ ...form, uploadFile: file });
+                    setErrorMsg(""); // Clear any previous errors
                   }}
                 />
               </div>
