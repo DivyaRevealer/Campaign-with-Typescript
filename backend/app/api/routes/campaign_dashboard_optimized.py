@@ -114,6 +114,7 @@ async def _get_kpi_data_optimized(
     filters: dict,
 ) -> CampaignKPIData:
     """Optimized KPI calculation using single query with multiple aggregations."""
+    # CampaignKPIData is already imported at module level
     
     try:
         # Add timeout to KPI query (25 seconds) to prevent blocking other queries
@@ -180,7 +181,6 @@ async def _get_kpi_data_optimized(
                 # No data found, return zeros
                 print("DEBUG: No row returned from query!", flush=True)
                 sys.stdout.flush()
-                from app.schemas.campaign_dashboard import CampaignKPIData
                 return CampaignKPIData(
                     total_customer=0.0,
                     unit_per_transaction=0.0,
@@ -256,7 +256,6 @@ async def _get_kpi_data_optimized(
             print("⚠️  Consider creating indexes on crm_analysis_tcm table for better performance", flush=True)
             import sys
             sys.stdout.flush()
-            from app.schemas.campaign_dashboard import CampaignKPIData
             return CampaignKPIData(
                 total_customer=0.0,
                 unit_per_transaction=0.0,
@@ -269,7 +268,6 @@ async def _get_kpi_data_optimized(
         # If KPI query fails, return default values instead of failing entire request
         # This allows charts to still load even if KPI query has issues
         print(f"Warning: KPI query failed: {e}, returning default values")
-        from app.schemas.campaign_dashboard import CampaignKPIData
         return CampaignKPIData(
             total_customer=0.0,
             unit_per_transaction=0.0,
