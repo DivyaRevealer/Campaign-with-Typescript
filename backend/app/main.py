@@ -2,6 +2,7 @@
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +27,7 @@ from app.core.logging import setup_logging
 from app.core.middleware import BodySizeLimitMiddleware, RequestContextLogMiddleware
 from app.core.rate_limit import init_rate_limiter
 from app.core.cache import get_redis_client, close_redis_client
+import asyncio
 
 setup_logging()
 
@@ -61,16 +63,24 @@ app.add_middleware(
 )
 
 app.add_middleware(BodySizeLimitMiddleware)
+# Add GZip compression for faster response times
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize Redis connection on startup."""
+    """Initialize Redis connection and warm cache on startup."""
     if getattr(settings, 'REDIS_ENABLED', True):
         try:
             client = await get_redis_client()
             if client:
                 print("✅ Redis cache initialized - Dashboard caching enabled")
+                # Warm cache in background (non-blocking)
+                try:
+                    from app.api.routes.campaign_dashboard_optimized import _warm_cache_on_startup
+                    asyncio.create_task(_warm_cache_on_startup())
+                except Exception:
+                    pass  # Cache warming is optional
             # Silently continue without Redis - no warning needed
             # The API works perfectly fine without Redis (still optimized with indexes)
         except Exception:

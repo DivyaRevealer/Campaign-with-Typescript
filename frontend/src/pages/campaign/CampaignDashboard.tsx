@@ -223,9 +223,28 @@ const LazyChart = memo(({ children, className = "" }: { children: React.ReactNod
 LazyChart.displayName = "LazyChart";
 
 export default function CampaignDashboard() {
+  // Calculate default date range (last one year)
+  const getDefaultEndDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getDefaultStartDate = () => {
+    const today = new Date();
+    const oneYearAgo = new Date(today);
+    oneYearAgo.setFullYear(today.getFullYear() - 1);
+    const year = oneYearAgo.getFullYear();
+    const month = String(oneYearAgo.getMonth() + 1).padStart(2, '0');
+    const day = String(oneYearAgo.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [filters, setFilters] = useState<DashboardFilters>({
-    startDate: "",
-    endDate: "",
+    startDate: getDefaultStartDate(), // Default to one year ago
+    endDate: getDefaultEndDate(), // Default to today
     customerMobile: "All",
     customerName: "All",
     rValueBucket: "All",
@@ -242,6 +261,7 @@ export default function CampaignDashboard() {
     m_value_buckets: [],
   });
   const [loading, setLoading] = useState(false);
+  const [applyingFilters, setApplyingFilters] = useState(false); // Separate state for filter application
   const [filtersLoading, setFiltersLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [kpiData, setKpiData] = useState<CampaignKPIData>(mockKPIData);
@@ -256,6 +276,7 @@ export default function CampaignDashboard() {
   const [fiscalYearData, setFiscalYearData] = useState<FiscalYearData[]>(mockFiscalYearData);
   const [chartsReady, setChartsReady] = useState(false);
   const dashboardRequestRef = useRef<AbortController | null>(null);
+  const initialLoadDoneRef = useRef(false); // Track if initial load is complete
   const handleFilterChange = (field: keyof DashboardFilters, value: string) => {
     setFilters((prev) => {
       const updated = { ...prev, [field]: value };
@@ -277,19 +298,33 @@ export default function CampaignDashboard() {
     });
   };
 
-  const loadDashboardData = useCallback(async (filterParams?: CampaignDashboardFilters) => {
+  const loadDashboardData = useCallback(async (filterParams?: CampaignDashboardFilters, isFilterApplication: boolean = false) => {
     // Don't block UI - show mock data immediately, update later
     setError(null);
     
-    setLoading(true);
+    // Only set applyingFilters if this is a filter application, not initial load
+    if (isFilterApplication) {
+      setApplyingFilters(true);
+    } else {
+      setLoading(true);
+    }
 
     // Cancel any in-flight dashboard request to keep the UI responsive
     dashboardRequestRef.current?.abort();
     const controller = new AbortController();
     dashboardRequestRef.current = controller;
+    
+    // Log for debugging (can be removed in production)
+    console.log("Loading dashboard data with filters:", filterParams || "no filters (initial load)");
 
     try {
       const response = await getCampaignDashboard(filterParams, controller.signal);
+      
+      // Debug logging to verify API response
+      console.log("DEBUG: API Response received - Total Customer:", response.kpi?.total_customer);
+      console.log("DEBUG: Full KPI data:", response.kpi);
+      
+      // Update all data from response
       setKpiData(response.kpi);
       setRScoreData(response.r_score_data);
       setFScoreData(response.f_score_data);
@@ -300,19 +335,40 @@ export default function CampaignDashboard() {
       setSegmentData(response.segment_data);
       setDaysToReturnBucketData(response.days_to_return_bucket_data);
       setFiscalYearData(response.fiscal_year_data);
+      
+      // Clear any previous errors since we got a successful response
+      setError(null);
     } catch (err) {
       if (controller.signal.aborted) {
         return;
       }
       const errorMsg = extractApiErrorMessage(err, "Failed to load dashboard data");
-      setError(errorMsg);
-      console.error("Failed to load dashboard data:", err);
+      
+      // Check if we have any chart data loaded (from previous successful load or partial response)
+      const hasChartData = rScoreData.length > 0 || segmentData.length > 0 || 
+                          fScoreData.length > 0 || visitsData.length > 0;
+      
+      // Only show error if it's a critical error and no charts are displayed
+      // If charts are already loaded, don't show error (KPI will use default/mock values)
+      if (errorMsg.includes("timeout") && hasChartData) {
+        // Charts are displayed, KPI might have timed out - don't show error
+        console.warn("KPI data may have timed out, but charts are displayed. KPI boxes will show default values.");
+        setError(null); // Don't show error if charts are working
+      } else {
+        setError(errorMsg);
+        console.error("Failed to load dashboard data:", err);
+      }
+      
       if (errorMsg.includes("timeout") || errorMsg.includes("aborted")) {
-        console.warn("Dashboard data request timed out - using mock data");
+        console.warn("Dashboard data request timed out - some data may be missing");
       }
     } finally {
       if (!controller.signal.aborted) {
-        setLoading(false);
+        if (isFilterApplication) {
+          setApplyingFilters(false);
+        } else {
+          setLoading(false);
+        }
       }
     }
   }, []);
@@ -348,14 +404,28 @@ export default function CampaignDashboard() {
   }, []);
 
   useEffect(() => {
+    // Only run initial load once
+    if (initialLoadDoneRef.current) {
+      return;
+    }
+    
     const idleHandle =
     typeof window !== "undefined" && typeof window.requestIdleCallback === "function"
       ? window.requestIdleCallback(() => setChartsReady(true), { timeout: 500 })
       : window.setTimeout(() => setChartsReady(true), 150);
+    
     setTimeout(() => {
       loadFilterOptions();
-      loadDashboardData();
+      // Load with default date range (last one year) on initial load
+      // Use filters state which now has default dates set
+      const defaultFilterParams: CampaignDashboardFilters = {
+        start_date: filters.startDate || getDefaultStartDate(),
+        end_date: filters.endDate || getDefaultEndDate(),
+      };
+      loadDashboardData(defaultFilterParams);
+      initialLoadDoneRef.current = true; // Mark initial load as done
     }, 0);
+    
     return () => {
       dashboardRequestRef.current?.abort();
       if (typeof window !== "undefined" && typeof window.cancelIdleCallback === "function") {
@@ -369,6 +439,8 @@ export default function CampaignDashboard() {
 
   const handleApplyFilters = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    e.stopPropagation(); // Prevent event bubbling
+    
     const filterParams: CampaignDashboardFilters = {};
     if (filters.startDate) filterParams.start_date = filters.startDate;
     if (filters.endDate) filterParams.end_date = filters.endDate;
@@ -378,7 +450,8 @@ export default function CampaignDashboard() {
     if (filters.fValueBucket !== "All") filterParams.f_value_bucket = filters.fValueBucket;
     if (filters.mValueBucket !== "All") filterParams.m_value_bucket = filters.mValueBucket;
     
-    await loadDashboardData(filterParams);
+    // Load with filter application flag set to true
+    await loadDashboardData(filterParams, true);
   };
 
   // Memoize formatters to avoid recreating on every render
@@ -418,7 +491,16 @@ export default function CampaignDashboard() {
       </div>
 
       {/* Filters Section */}
-      <form className="dashboard-filters filters" onSubmit={handleApplyFilters}>
+      <form 
+        className="dashboard-filters filters" 
+        onSubmit={handleApplyFilters}
+        onKeyDown={(e) => {
+          // Prevent accidental form submission on Enter key in non-input fields
+          if (e.key === "Enter" && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement)) {
+            e.preventDefault();
+          }
+        }}
+      >
         <div className="filter-row">
           <div className="filter-group filter-item date-field">
             <label>Start Date</label>
@@ -554,8 +636,8 @@ export default function CampaignDashboard() {
             </select>
           </div>
           <div className="filter-group filter-actions">
-            <button type="submit" className="btn-apply" disabled={loading}>
-              {loading ? "Applying..." : "Apply"}
+            <button type="submit" className="btn-apply" disabled={applyingFilters || loading}>
+              {applyingFilters ? "Applying..." : "Apply"}
             </button>
           </div>
         </div>

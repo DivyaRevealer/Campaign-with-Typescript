@@ -107,12 +107,13 @@ check_prerequisites() {
         exit 1
     fi
     
-    # Check if database indexes file exists
-    if [ -f "$SCRIPT_DIR/database_indexes_campaign_dashboard.sql" ]; then
-        print_success "Database indexes SQL file found"
+    # Check if database indexes file exists (TCM table)
+    if [ -f "$SCRIPT_DIR/database_indexes_campaign_dashboard_tcm.sql" ]; then
+        print_success "Database indexes SQL file for crm_analysis_tcm found"
+    elif [ -f "$SCRIPT_DIR/scripts/create_tcm_indexes.py" ]; then
+        print_success "Python script for creating TCM indexes found"
     else
-        print_error "database_indexes_campaign_dashboard.sql not found"
-        exit 1
+        print_warning "database_indexes_campaign_dashboard_tcm.sql not found, will try Python script"
     fi
 }
 
@@ -148,12 +149,12 @@ create_indexes() {
         exit 1
     fi
     
-    # Check if indexes already exist
+    # Check if indexes already exist for crm_analysis_tcm (the table we're using)
     EXISTING_INDEXES=$(mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" -D "$DB_NAME" \
-        -se "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_NAME = 'crm_analysis' AND INDEX_NAME LIKE 'idx_crm_%';" 2>/dev/null)
+        -se "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_NAME = 'crm_analysis_tcm' AND INDEX_NAME LIKE 'idx_crm_tcm_%';" 2>/dev/null)
     
     if [ "$EXISTING_INDEXES" -gt 0 ]; then
-        print_warning "Found $EXISTING_INDEXES existing indexes"
+        print_warning "Found $EXISTING_INDEXES existing indexes on crm_analysis_tcm"
         read -p "Do you want to recreate them? (y/N): " RECREATE
         if [[ ! $RECREATE =~ ^[Yy]$ ]]; then
             print_info "Skipping index creation"
@@ -161,19 +162,33 @@ create_indexes() {
         fi
     fi
     
-    # Apply indexes
-    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < "$SCRIPT_DIR/database_indexes_campaign_dashboard.sql" 2>&1 | tee -a "$LOG_FILE"
-    
-    if [ $? -eq 0 ]; then
-        print_success "Database indexes created successfully"
+    # Apply indexes for crm_analysis_tcm (the table currently in use)
+    if [ -f "$SCRIPT_DIR/database_indexes_campaign_dashboard_tcm.sql" ]; then
+        print_info "Creating indexes on crm_analysis_tcm table..."
+        mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < "$SCRIPT_DIR/database_indexes_campaign_dashboard_tcm.sql" 2>&1 | tee -a "$LOG_FILE"
         
-        # Verify indexes
-        INDEX_COUNT=$(mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" -D "$DB_NAME" \
-            -se "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_NAME = 'crm_analysis' AND INDEX_NAME LIKE 'idx_crm_%';" 2>/dev/null)
-        print_success "Total indexes created: $INDEX_COUNT"
+        if [ $? -eq 0 ]; then
+            print_success "Database indexes created successfully on crm_analysis_tcm"
+            
+            # Verify indexes
+            INDEX_COUNT=$(mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" -D "$DB_NAME" \
+                -se "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_NAME = 'crm_analysis_tcm' AND INDEX_NAME LIKE 'idx_crm_tcm_%';" 2>/dev/null)
+            print_success "Total indexes created on crm_analysis_tcm: $INDEX_COUNT"
+        else
+            print_error "Failed to create database indexes on crm_analysis_tcm"
+            exit 1
+        fi
     else
-        print_error "Failed to create database indexes"
-        exit 1
+        print_warning "database_indexes_campaign_dashboard_tcm.sql not found, trying Python script..."
+        # Fallback to Python script
+        cd "$SCRIPT_DIR"
+        python3 scripts/create_tcm_indexes.py 2>&1 | tee -a "$LOG_FILE"
+        if [ $? -eq 0 ]; then
+            print_success "Indexes created via Python script"
+        else
+            print_error "Failed to create indexes. Please run manually: python scripts/create_tcm_indexes.py"
+            exit 1
+        fi
     fi
 }
 
@@ -335,10 +350,10 @@ DEPLOYMENT STATUS
 ───────────────────────────────────────────────────────────
 EOF
     
-    # Check indexes
+    # Check indexes for crm_analysis_tcm
     INDEX_COUNT=$(mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" -D "$DB_NAME" \
-        -se "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_NAME = 'crm_analysis' AND INDEX_NAME LIKE 'idx_crm_%';" 2>/dev/null)
-    echo "✓ Database Indexes: $INDEX_COUNT created" >> "$REPORT_FILE"
+        -se "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_NAME = 'crm_analysis_tcm' AND INDEX_NAME LIKE 'idx_crm_tcm_%';" 2>/dev/null)
+    echo "✓ Database Indexes (crm_analysis_tcm): $INDEX_COUNT created" >> "$REPORT_FILE"
     
     # Check Python packages
     if pip3 show redis &> /dev/null; then
@@ -384,12 +399,12 @@ MONITORING
 ───────────────────────────────────────────────────────────
 - Check logs: $LOG_FILE
 - Monitor Redis: redis-cli monitor
-- Database performance: SHOW INDEX FROM crm_analysis;
+- Database performance: SHOW INDEX FROM crm_analysis_tcm;
 
 TROUBLESHOOTING
 ───────────────────────────────────────────────────────────
 If dashboard is slow:
-  - Verify indexes: SHOW INDEX FROM crm_analysis;
+  - Verify indexes: SHOW INDEX FROM crm_analysis_tcm;
   - Check Redis: redis-cli ping
   - Review logs: $LOG_FILE
 

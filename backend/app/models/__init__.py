@@ -13,6 +13,7 @@ from app.models.inv_production_entry import InvProductionDtl, InvProductionHdr
 from app.models.inv_sales_order import InvSoDtl, InvSoHdr, InvSoSubDtl
 from app.models.inv_user import InvUserMaster
 from app.models.inv_crm_analysis import InvCrmAnalysis
+from app.models.inv_crm_analysis_tcm import InvCrmAnalysisTcm
 from app.models.inv_create_campaign import InvCreateCampaign
 from app.models.inv_campaign_brand_filter import InvCampaignBrandFilter
 from app.models.inv_campaign_upload import InvCampaignUpload
@@ -36,6 +37,7 @@ __all__ = [
     "InvSoSubDtl",
     "InvUserMaster",
     "InvCrmAnalysis",
+    "InvCrmAnalysisTcm",
     "InvCreateCampaign",
     "InvCampaignBrandFilter",
     "InvCampaignUpload",

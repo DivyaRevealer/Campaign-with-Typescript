@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.audit import log_audit
 from app.core.db import get_session
 from app.core.deps import get_current_user
-from app.models.inv_crm_analysis import InvCrmAnalysis
+from app.models.inv_crm_analysis_tcm import InvCrmAnalysisTcm
 from app.models.inv_user import InvUserMaster
 from app.schemas.campaign_dashboard import (
     CampaignDashboardOut,
@@ -30,27 +30,27 @@ def _apply_base_filters(query, filters: dict):
     # Date filters
     start_date = filters.get("start_date")
     if start_date and start_date.strip():
-        query = query.where(InvCrmAnalysis.first_in_date >= start_date)
+        query = query.where(InvCrmAnalysisTcm.first_in_date >= start_date)
     
     end_date = filters.get("end_date")
     if end_date and end_date.strip():
-        query = query.where(InvCrmAnalysis.first_in_date <= end_date)
+        query = query.where(InvCrmAnalysisTcm.first_in_date <= end_date)
     
     # Customer filters - skip if "All" or empty
     customer_mobile = filters.get("customer_mobile")
     if customer_mobile and customer_mobile != "All" and customer_mobile.strip():
-        query = query.where(InvCrmAnalysis.cust_mobileno == customer_mobile)
+        query = query.where(InvCrmAnalysisTcm.cust_mobileno == customer_mobile)
     
     customer_name = filters.get("customer_name")
     if customer_name and customer_name != "All" and customer_name.strip():
-        query = query.where(InvCrmAnalysis.customer_name == customer_name)
+        query = query.where(InvCrmAnalysisTcm.customer_name == customer_name)
     
     # R value bucket filter - use indexed R_SCORE (score 1-5)
     r_value_bucket = filters.get("r_value_bucket")
     if r_value_bucket and r_value_bucket != "All":
         try:
             r_score = int(r_value_bucket)
-            query = query.where(InvCrmAnalysis.r_score == r_score)
+            query = query.where(InvCrmAnalysisTcm.r_score == r_score)
         except (ValueError, TypeError):
             pass
     
@@ -59,7 +59,7 @@ def _apply_base_filters(query, filters: dict):
     if f_value_bucket and f_value_bucket != "All":
         try:
             f_score = int(f_value_bucket)
-            query = query.where(InvCrmAnalysis.f_score == f_score)
+            query = query.where(InvCrmAnalysisTcm.f_score == f_score)
         except (ValueError, TypeError):
             pass
     
@@ -68,7 +68,7 @@ def _apply_base_filters(query, filters: dict):
     if m_value_bucket and m_value_bucket != "All":
         try:
             m_score = int(m_value_bucket)
-            query = query.where(InvCrmAnalysis.m_score == m_score)
+            query = query.where(InvCrmAnalysisTcm.m_score == m_score)
         except (ValueError, TypeError):
             pass
     
@@ -82,12 +82,12 @@ async def _get_kpi_data(
     """Calculate KPI metrics from CRM analysis table."""
     
     # Total customers
-    total_query = select(func.count(InvCrmAnalysis.cust_mobileno))
+    total_query = select(func.count(InvCrmAnalysisTcm.cust_mobileno))
     total_query = _apply_base_filters(total_query, filters)
     total_customer = (await session.execute(total_query)).scalar() or 0.0
     
     # Unit per transaction (average items per customer)
-    unit_query = select(func.avg(InvCrmAnalysis.no_of_items))
+    unit_query = select(func.avg(InvCrmAnalysisTcm.no_of_items))
     unit_query = _apply_base_filters(unit_query, filters)
     unit_per_transaction = float((await session.execute(unit_query)).scalar() or 0.0)
     
@@ -95,20 +95,20 @@ async def _get_kpi_data(
     profit_per_customer = 0.0
     
     # Customer spending (average spending per customer, not total)
-    spending_query = select(func.avg(InvCrmAnalysis.total_sales))
+    spending_query = select(func.avg(InvCrmAnalysisTcm.total_sales))
     spending_query = _apply_base_filters(spending_query, filters)
     customer_spending = float((await session.execute(spending_query)).scalar() or 0.0)
     
     # Days to return (average days)
-    days_query = select(func.avg(InvCrmAnalysis.days))
+    days_query = select(func.avg(InvCrmAnalysisTcm.days))
     days_query = _apply_base_filters(days_query, filters)
     days_to_return = float((await session.execute(days_query)).scalar() or 0.0)
     
     # Retention rate (customers with f_score > 1 are returning customers)
     retention_query = select(
         func.count(
-            case((InvCrmAnalysis.f_score > 1, InvCrmAnalysis.cust_mobileno))
-        ) / func.nullif(func.count(InvCrmAnalysis.cust_mobileno), 0) * 100
+            case((InvCrmAnalysisTcm.f_score > 1, InvCrmAnalysisTcm.cust_mobileno))
+        ) / func.nullif(func.count(InvCrmAnalysisTcm.cust_mobileno), 0) * 100
     )
     retention_query = _apply_base_filters(retention_query, filters)
     retention_rate = float((await session.execute(retention_query)).scalar() or 0.0)
@@ -133,10 +133,10 @@ async def _get_r_score_data(
     # Everything else is "Other"
     query = select(
         case(
-            (InvCrmAnalysis.r_score == 5, "Bought Most Recently"),
+            (InvCrmAnalysisTcm.r_score == 5, "Bought Most Recently"),
             else_="Other"
         ).label("category"),
-        func.count(InvCrmAnalysis.cust_mobileno).label("count")
+        func.count(InvCrmAnalysisTcm.cust_mobileno).label("count")
     )
     
     # Apply filters
@@ -157,13 +157,13 @@ async def _get_f_score_data(
     """Get F score distribution data."""
     
     query = select(
-        InvCrmAnalysis.f_score,
-        func.count(InvCrmAnalysis.cust_mobileno).label("count")
+        InvCrmAnalysisTcm.f_score,
+        func.count(InvCrmAnalysisTcm.cust_mobileno).label("count")
     )
     
     # Apply filters
     query = _apply_base_filters(query, filters)
-    query = query.group_by(InvCrmAnalysis.f_score).order_by(InvCrmAnalysis.f_score)
+    query = query.group_by(InvCrmAnalysisTcm.f_score).order_by(InvCrmAnalysisTcm.f_score)
     
     results = (await session.execute(query)).all()
     
@@ -193,13 +193,13 @@ async def _get_m_score_data(
     """Get M score distribution data."""
     
     query = select(
-        InvCrmAnalysis.m_score,
-        func.count(InvCrmAnalysis.cust_mobileno).label("count")
+        InvCrmAnalysisTcm.m_score,
+        func.count(InvCrmAnalysisTcm.cust_mobileno).label("count")
     )
     
     # Apply filters
     query = _apply_base_filters(query, filters)
-    query = query.group_by(InvCrmAnalysis.m_score).order_by(InvCrmAnalysis.m_score)
+    query = query.group_by(InvCrmAnalysisTcm.m_score).order_by(InvCrmAnalysisTcm.m_score)
     
     results = (await session.execute(query)).all()
     
@@ -220,13 +220,13 @@ async def _get_r_value_bucket_data(
     """Get recency score distribution based on R_SCORE (score 1-5)."""
     
     query = select(
-        InvCrmAnalysis.r_score,
-        func.count(InvCrmAnalysis.cust_mobileno).label("count")
+        InvCrmAnalysisTcm.r_score,
+        func.count(InvCrmAnalysisTcm.cust_mobileno).label("count")
     )
     
     # Apply filters
     query = _apply_base_filters(query, filters)
-    query = query.group_by(InvCrmAnalysis.r_score).order_by(InvCrmAnalysis.r_score)
+    query = query.group_by(InvCrmAnalysisTcm.r_score).order_by(InvCrmAnalysisTcm.r_score)
     
     results = (await session.execute(query)).all()
     
@@ -259,13 +259,13 @@ async def _get_visits_data(
     """Get frequency score distribution based on F_SCORE (frequency score 1-5)."""
     
     query = select(
-        InvCrmAnalysis.f_score,
-        func.count(InvCrmAnalysis.cust_mobileno).label("count")
+        InvCrmAnalysisTcm.f_score,
+        func.count(InvCrmAnalysisTcm.cust_mobileno).label("count")
     )
     
     # Apply filters
     query = _apply_base_filters(query, filters)
-    query = query.group_by(InvCrmAnalysis.f_score).order_by(InvCrmAnalysis.f_score)
+    query = query.group_by(InvCrmAnalysisTcm.f_score).order_by(InvCrmAnalysisTcm.f_score)
     
     results = (await session.execute(query)).all()
     
@@ -294,13 +294,13 @@ async def _get_value_data(
     """Get monetary score distribution based on M_SCORE (monetary score 1-5)."""
     
     query = select(
-        InvCrmAnalysis.m_score,
-        func.count(InvCrmAnalysis.cust_mobileno).label("count")
+        InvCrmAnalysisTcm.m_score,
+        func.count(InvCrmAnalysisTcm.cust_mobileno).label("count")
     )
     
     # Apply filters
     query = _apply_base_filters(query, filters)
-    query = query.group_by(InvCrmAnalysis.m_score).order_by(InvCrmAnalysis.m_score)
+    query = query.group_by(InvCrmAnalysisTcm.m_score).order_by(InvCrmAnalysisTcm.m_score)
     
     results = (await session.execute(query)).all()
     
@@ -329,13 +329,13 @@ async def _get_segment_data(
     """Get customer segment distribution from SEGMENT_MAP field."""
     
     query = select(
-        InvCrmAnalysis.segment_map,
-        func.count(InvCrmAnalysis.cust_mobileno).label("count")
+        InvCrmAnalysisTcm.segment_map,
+        func.count(InvCrmAnalysisTcm.cust_mobileno).label("count")
     )
     
     # Apply filters
     query = _apply_base_filters(query, filters)
-    query = query.group_by(InvCrmAnalysis.segment_map)
+    query = query.group_by(InvCrmAnalysisTcm.segment_map)
     
     results = (await session.execute(query)).all()
     
@@ -367,7 +367,7 @@ async def _get_days_to_return_bucket_data(
     """Get days to return bucket distribution based on DAYS field."""
     
     # Get all rows with filters applied, then aggregate in Python (matching old logic)
-    base_query = select(InvCrmAnalysis)
+    base_query = select(InvCrmAnalysisTcm)
     base_query = _apply_base_filters(base_query, filters)
     rows = (await session.execute(base_query)).scalars().all()
     
@@ -403,7 +403,7 @@ async def _get_fiscal_year_data(
     """Get fiscal year customer percentage data based on year count fields."""
     
     # Get all rows with filters applied
-    base_query = select(InvCrmAnalysis)
+    base_query = select(InvCrmAnalysisTcm)
     base_query = _apply_base_filters(base_query, filters)
     rows = (await session.execute(base_query)).scalars().all()
     
@@ -456,25 +456,25 @@ async def get_campaign_dashboard_filters(
     try:
         # Get distinct customer mobile numbers - ordered for consistency
         # Filter out None, empty strings, and whitespace-only values
-        mobile_query = select(InvCrmAnalysis.cust_mobileno).distinct().where(
+        mobile_query = select(InvCrmAnalysisTcm.cust_mobileno).distinct().where(
             and_(
-                InvCrmAnalysis.cust_mobileno.isnot(None),
-                InvCrmAnalysis.cust_mobileno != "",
-                InvCrmAnalysis.cust_mobileno != " "
+                InvCrmAnalysisTcm.cust_mobileno.isnot(None),
+                InvCrmAnalysisTcm.cust_mobileno != "",
+                InvCrmAnalysisTcm.cust_mobileno != " "
             )
-        ).order_by(InvCrmAnalysis.cust_mobileno)
+        ).order_by(InvCrmAnalysisTcm.cust_mobileno)
         mobile_results = (await session.execute(mobile_query)).scalars().all()
         customer_mobiles = [str(m).strip() for m in mobile_results if m and str(m).strip()]
         
         # Get distinct customer names - ordered for consistency
         # Filter out None, empty strings, and whitespace-only values
-        name_query = select(InvCrmAnalysis.customer_name).distinct().where(
+        name_query = select(InvCrmAnalysisTcm.customer_name).distinct().where(
             and_(
-                InvCrmAnalysis.customer_name.isnot(None),
-                InvCrmAnalysis.customer_name != "",
-                InvCrmAnalysis.customer_name != " "
+                InvCrmAnalysisTcm.customer_name.isnot(None),
+                InvCrmAnalysisTcm.customer_name != "",
+                InvCrmAnalysisTcm.customer_name != " "
             )
-        ).order_by(InvCrmAnalysis.customer_name)
+        ).order_by(InvCrmAnalysisTcm.customer_name)
         name_results = (await session.execute(name_query)).scalars().all()
         customer_names = [str(n).strip() for n in name_results if n and str(n).strip()]
         
@@ -496,7 +496,7 @@ async def get_campaign_dashboard_filters(
         if "doesn't exist" in error_msg.lower() or "table" in error_msg.lower():
             raise HTTPException(
                 status_code=500,
-                detail=f"Database table 'crm_analysis' not found. Please create the table first. Error: {error_msg}"
+                detail=f"Database table 'crm_analysis_tcm' not found. Please create the table first. Error: {error_msg}"
             )
         raise HTTPException(
             status_code=500,
@@ -592,7 +592,7 @@ async def get_campaign_dashboard(
         if "doesn't exist" in error_msg.lower() or "table" in error_msg.lower():
             raise HTTPException(
                 status_code=500,
-                detail=f"Database table 'crm_analysis' not found. Please create the table first. Error: {error_msg}"
+                detail=f"Database table 'crm_analysis_tcm' not found. Please create the table first. Error: {error_msg}"
             )
         raise HTTPException(
             status_code=500,

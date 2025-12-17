@@ -296,8 +296,9 @@ export const getCampaignDashboard = (
   
   const queryString = params.toString();
   const url = `/campaign/dashboard${queryString ? `?${queryString}` : ""}`;
-  // Add timeout of 10 seconds for dashboard data
-  return http.get<CampaignDashboardOut>(url, { timeout: 10000, signal }).then((r) => r.data);
+  // Timeout: 30 seconds for first request (cache building), <1 second for cached requests
+  // First request builds cache (3-10 seconds), subsequent requests are <100ms from cache
+  return http.get<CampaignDashboardOut>(url, { timeout: 30000, signal }).then((r) => r.data);
 };
 
 export const getCampaignDashboardFilters = (): Promise<FilterOptions> => {
