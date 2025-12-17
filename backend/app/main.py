@@ -67,14 +67,56 @@ app.add_middleware(BodySizeLimitMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
+async def _verify_dashboard_indexes():
+    """Verify that required indexes exist for campaign dashboard (non-blocking check)."""
+    try:
+        from sqlalchemy import text
+        from app.core.db import SessionLocal
+        
+        required_indexes = [
+            "idx_crm_tcm_first_in_date",
+            "idx_crm_tcm_r_score",
+            "idx_crm_tcm_f_score",
+            "idx_crm_tcm_m_score",
+        ]
+        
+        async with SessionLocal() as session:
+            check_sql = text("""
+                SELECT INDEX_NAME
+                FROM INFORMATION_SCHEMA.STATISTICS
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'crm_analysis_tcm'
+                AND INDEX_NAME IN :index_names
+                GROUP BY INDEX_NAME
+            """)
+            result = await session.execute(check_sql, {"index_names": tuple(required_indexes)})
+            existing = {row[0] for row in result.fetchall()}
+            missing = [idx for idx in required_indexes if idx not in existing]
+            
+            if missing:
+                print(f"⚠️  WARNING: Missing {len(missing)} critical indexes on crm_analysis_tcm table!", flush=True)
+                print(f"   Missing: {', '.join(missing)}", flush=True)
+                print(f"   Dashboard queries will be slow (30-90 seconds instead of 5-10 seconds)", flush=True)
+                print(f"   Run: python scripts/create_tcm_indexes.py", flush=True)
+            else:
+                print("✅ Campaign dashboard indexes verified", flush=True)
+    except Exception:
+        # Don't fail startup if index check fails
+        pass
+
+
 @app.on_event("startup")
 async def startup_event():
-    """Initialize Redis connection and warm cache on startup."""
+    """Initialize Redis connection, verify indexes, and warm cache on startup."""
+    # Verify indexes in background (non-blocking)
+    asyncio.create_task(_verify_dashboard_indexes())
+    
+    # Initialize Redis
     if getattr(settings, 'REDIS_ENABLED', True):
         try:
             client = await get_redis_client()
             if client:
-                print("✅ Redis cache initialized - Dashboard caching enabled")
+                print("✅ Redis cache initialized - Dashboard caching enabled", flush=True)
                 # Warm cache in background (non-blocking)
                 try:
                     from app.api.routes.campaign_dashboard_optimized import _warm_cache_on_startup

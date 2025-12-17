@@ -43,7 +43,6 @@ def _apply_base_filters(query, filters: dict):
     
     # Date filters - use indexed FIRST_IN_DATE
     start_date = filters.get("start_date")
-    print(f"DEBUG _apply_base_filters: start_date = {start_date} (type: {type(start_date)})", flush=True)
     if start_date and start_date.strip():
         # Convert string to date object for proper comparison
         try:
@@ -51,13 +50,12 @@ def _apply_base_filters(query, filters: dict):
                 start_date_obj = dt.strptime(start_date, "%Y-%m-%d").date()
             else:
                 start_date_obj = start_date
-            print(f"DEBUG _apply_base_filters: Applying start_date filter: {start_date_obj}", flush=True)
             query = query.where(InvCrmAnalysisTcm.first_in_date >= start_date_obj)
-        except Exception as e:
-            print(f"DEBUG _apply_base_filters: Error parsing start_date: {e}", flush=True)
+        except Exception:
+            # Invalid date format - skip filter
+            pass
     
     end_date = filters.get("end_date")
-    print(f"DEBUG _apply_base_filters: end_date = {end_date} (type: {type(end_date)})", flush=True)
     if end_date and end_date.strip():
         # Convert string to date object for proper comparison
         try:
@@ -65,10 +63,10 @@ def _apply_base_filters(query, filters: dict):
                 end_date_obj = dt.strptime(end_date, "%Y-%m-%d").date()
             else:
                 end_date_obj = end_date
-            print(f"DEBUG _apply_base_filters: Applying end_date filter: {end_date_obj}", flush=True)
             query = query.where(InvCrmAnalysisTcm.first_in_date <= end_date_obj)
-        except Exception as e:
-            print(f"DEBUG _apply_base_filters: Error parsing end_date: {e}", flush=True)
+        except Exception:
+            # Invalid date format - skip filter
+            pass
     
     # Customer filters - use indexed columns
     customer_mobile = filters.get("customer_mobile")
@@ -190,9 +188,10 @@ async def _get_kpi_data_optimized(
             print(f"⏱️  KPI query completed in {elapsed:.2f} seconds")
             return result
         except (AsyncTimeoutError, asyncio.TimeoutError):
-            print("⚠️  WARNING: KPI query timed out after 180 seconds, returning default values", flush=True)
+            print("⚠️  WARNING: KPI query timed out after 45 seconds, returning default values", flush=True)
             print("⚠️  This may indicate missing indexes or database performance issues", flush=True)
-            print("⚠️  Consider creating indexes on crm_analysis_tcm table for better performance", flush=True)
+            print("⚠️  Verify indexes: python scripts/verify_tcm_indexes.py", flush=True)
+            print("⚠️  Create indexes: python scripts/create_tcm_indexes.py", flush=True)
             import sys
             sys.stdout.flush()
             return CampaignKPIData(
@@ -586,15 +585,13 @@ async def _refresh_cache_if_stale(
 ):
     """Background task to refresh cache if it's getting stale (non-blocking)."""
     try:
-        # Check if cache is getting stale (older than 50 minutes)
-        # If so, refresh in background
-        from app.core.cache import get_redis_client
-        client = await get_redis_client()
-        if client:
-            ttl = await client.ttl(cache_key)
-            # If cache has less than 10 minutes left, refresh it
-            if 0 < ttl < 600:  # Less than 10 minutes remaining
-                await _refresh_cache_background(session, filters, cache_key, stale_cache_key, None, None)
+        # Check if cache is getting stale using TTL helper (works with Redis and in-memory)
+        from app.core.cache import get_cache_ttl
+        ttl = await get_cache_ttl(cache_key)
+        # If cache has less than 10 minutes left, refresh it
+        # ttl > 0 means key exists and has expiry, ttl < 600 means less than 10 minutes
+        if 0 < ttl < 600:  # Less than 10 minutes remaining
+            await _refresh_cache_background(session, filters, cache_key, stale_cache_key, None, None)
     except Exception:
         # Ignore errors in background refresh
         pass
@@ -604,11 +601,16 @@ async def _warm_cache_on_startup():
     """Warm cache on server startup for default filters (non-blocking)."""
     try:
         from app.core.db import SessionLocal
+        from datetime import datetime, timedelta
+        
         async with SessionLocal() as session:
-            # Warm cache for default (no filters) dashboard
+            # Warm cache for default date range (last one year)
+            today = datetime.now().date()
+            one_year_ago = today - timedelta(days=365)
+            
             default_filters = {
-                "start_date": None,
-                "end_date": None,
+                "start_date": one_year_ago.strftime("%Y-%m-%d"),
+                "end_date": today.strftime("%Y-%m-%d"),
                 "customer_mobile": None,
                 "customer_name": None,
                 "r_value_bucket": None,
@@ -618,7 +620,7 @@ async def _warm_cache_on_startup():
             cache_key = generate_cache_key("campaign_dashboard", **default_filters)
             stale_cache_key = f"{cache_key}:stale"
             await _refresh_cache_background(session, default_filters, cache_key, stale_cache_key, None, None)
-            print("✅ Dashboard cache warmed on startup")
+            print("✅ Dashboard cache warmed on startup (in-memory or Redis)")
     except Exception:
         pass  # Cache warming is optional, don't fail startup
 
@@ -725,11 +727,7 @@ async def get_campaign_dashboard_optimized(
         "m_value_bucket": m_value_bucket if m_value_bucket and m_value_bucket != "All" and m_value_bucket.strip() else None,
     }
     
-    # Log default date range for debugging
-    if not start_date or not start_date.strip():
-        print(f"DEBUG: Using default start_date (last one year): {filters['start_date']}", flush=True)
-    if not end_date or not end_date.strip():
-        print(f"DEBUG: Using default end_date (today): {filters['end_date']}", flush=True)
+    # Default date range is set to last one year if not provided
     
     # Generate cache key from filters
     cache_key = generate_cache_key("campaign_dashboard", **filters)
@@ -752,14 +750,21 @@ async def get_campaign_dashboard_optimized(
         return CampaignDashboardOut(**cached_result)
     
     # Try stale cache if fresh cache miss (stale-while-revalidate pattern)
+    stale_start = time.time()
     stale_result = await get_cache(stale_cache_key)
+    stale_check_time = time.time() - stale_start
+    
     if stale_result:
         # Return stale cache immediately, refresh in background
         asyncio.create_task(_refresh_cache_background(session, filters, cache_key, stale_cache_key, request, user))
-        print(f"✅ Stale cache HIT! Returning in {cache_check_time:.3f}s, refreshing in background")
+        print(f"✅ Stale cache HIT! Returning in {stale_check_time:.3f}s, refreshing in background")
         return CampaignDashboardOut(**stale_result)
     
-    print(f"❌ Cache MISS (checked in {cache_check_time:.3f}s) - querying database (this will take ~90s for first request)")
+    total_cache_time = cache_check_time + stale_check_time
+    if total_cache_time > 0.5:
+        print(f"⚠️  Cache check took {total_cache_time:.3f}s (Redis may not be running) - querying database (this will take ~78s)")
+    else:
+        print(f"❌ Cache MISS (checked in {total_cache_time:.3f}s) - querying database (this will take ~78s)")
     
     try:
         # Execute all queries in parallel for maximum performance

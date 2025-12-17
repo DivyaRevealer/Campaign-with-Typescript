@@ -283,17 +283,31 @@ export default function CampaignDashboard() {
       
       // Comprehensive debug logging to verify API response
       console.log("✅ [Dashboard] API Response received successfully");
-      console.log("✅ [Dashboard] KPI - Total Customer:", response.kpi?.total_customer);
-      console.log("✅ [Dashboard] KPI - Full data:", JSON.stringify(response.kpi, null, 2));
+      if (response.kpi) {
+        console.log("✅ [Dashboard] KPI - Total Customer:", response.kpi.total_customer);
+        try {
+          console.log("✅ [Dashboard] KPI - Full data:", JSON.stringify(response.kpi, null, 2));
+        } catch (e) {
+          console.log("✅ [Dashboard] KPI - Full data: [Unable to stringify]");
+        }
+      }
       console.log("✅ [Dashboard] R Score Data length:", response.r_score_data?.length || 0);
       console.log("✅ [Dashboard] F Score Data length:", response.f_score_data?.length || 0);
       console.log("✅ [Dashboard] M Score Data length:", response.m_score_data?.length || 0);
       console.log("✅ [Dashboard] Segment Data length:", response.segment_data?.length || 0);
-      console.log("✅ [Dashboard] Full Response:", JSON.stringify(response, null, 2));
+      try {
+        console.log("✅ [Dashboard] Full Response:", JSON.stringify(response, null, 2));
+      } catch (e) {
+        console.log("✅ [Dashboard] Full Response: [Unable to stringify]");
+      }
       
       // Validate and update all data from response with null checks
       if (response.kpi) {
-        console.log("✅ [Dashboard] Updating KPI data:", response.kpi);
+        try {
+          console.log("✅ [Dashboard] Updating KPI data:", JSON.stringify(response.kpi, null, 2));
+        } catch (e) {
+          console.log("✅ [Dashboard] Updating KPI data: [Unable to stringify]");
+        }
         setKpiData(response.kpi);
       } else {
         console.warn("⚠️ [Dashboard] KPI data is missing in response");
@@ -412,7 +426,11 @@ export default function CampaignDashboard() {
           setTimeout(() => reject(new Error("Filter options request timed out")), 10000)
         )
       ]);
-      console.log("Filter options loaded from database:", options);
+      try {
+        console.log("Filter options loaded from database:", JSON.stringify(options, null, 2));
+      } catch (e) {
+        console.log("Filter options loaded from database: [Unable to stringify]");
+      }
       setFilterOptions(options);
     } catch (err) {
       // Safely log error - convert error object to string to avoid "Cannot convert object to primitive value"
