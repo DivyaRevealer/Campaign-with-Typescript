@@ -120,33 +120,10 @@ async def _get_kpi_data_optimized(
         # Add timeout to KPI query (25 seconds) to prevent blocking other queries
         # This ensures charts can load even if KPI query is slow
         async def _execute_kpi_query():
-            # First, verify the actual table count without any filters using raw SQL
-            # This helps debug if there's a table-level limit
-            from sqlalchemy import text
-            verify_query = text("SELECT COUNT(*) as total_rows FROM crm_analysis_tcm")
-            verify_result = await session.execute(verify_query)
-            total_table_rows = verify_result.scalar()
-            print(f"DEBUG: Total rows in crm_analysis_tcm table (no filters, raw SQL): {total_table_rows:,}")
-            
-            # Also check count using SQLAlchemy ORM to compare
-            orm_count_query = select(func.count(1)).select_from(InvCrmAnalysisTcm)
-            orm_count_result = await session.execute(orm_count_query)
-            orm_count = orm_count_result.scalar()
-            print(f"DEBUG: Total rows using ORM count(1): {orm_count:,}")
-            
-            # Single query to get all KPI metrics at once (much faster than multiple queries)
-            # Use indexed columns for better performance
-            # CRITICAL: Build query properly to ensure WHERE clauses are applied
-            
-            # Debug: Print filters before applying
-            print(f"DEBUG: Filters dict before applying to KPI query: {filters}", flush=True)
-            print(f"DEBUG: start_date in filters: {filters.get('start_date')}", flush=True)
-            print(f"DEBUG: end_date in filters: {filters.get('end_date')}", flush=True)
-            
-            # Build query with column references - SQLAlchemy will infer the table
-            # This pattern works for other queries like _get_days_to_return_bucket_data_optimized
+            # Single optimized query to get all KPI metrics at once
+            # No redundant table counts - only query what we need
             query = select(
-                func.count(InvCrmAnalysisTcm.cust_mobileno).label("total_customer"),  # Use column reference
+                func.count(InvCrmAnalysisTcm.cust_mobileno).label("total_customer"),
                 func.avg(InvCrmAnalysisTcm.no_of_items).label("unit_per_transaction"),
                 func.avg(InvCrmAnalysisTcm.total_sales).label("customer_spending"),
                 func.avg(InvCrmAnalysisTcm.days).label("days_to_return"),
@@ -155,32 +132,13 @@ async def _get_kpi_data_optimized(
                 func.count(InvCrmAnalysisTcm.total_sales).label("sales_count"),
             )
             
-            # Apply filters - this MUST add WHERE clauses
-            print(f"DEBUG: Query before applying filters: {str(query)}", flush=True)
+            # Apply filters
             query = _apply_base_filters(query, filters)
-            print(f"DEBUG: Query after applying filters: {str(query)}", flush=True)
-            
-            # Log the actual SQL query being executed for debugging
-            compiled_query = str(query.compile(compile_kwargs={"literal_binds": True}))
-            print(f"DEBUG: KPI Query SQL (full query): {compiled_query}", flush=True)
-            print(f"DEBUG: Query has WHERE clause: {'WHERE' in compiled_query.upper()}", flush=True)
             
             result = await session.execute(query)
             row = result.first()
             
-            # Force immediate output with flush
-            import sys
-            print(f"DEBUG: Query executed, row result: {row}", flush=True)
-            print(f"DEBUG: Row type: {type(row)}", flush=True)
-            if row:
-                print(f"DEBUG: Row attributes: {dir(row)}", flush=True)
-                total_cust_attr = getattr(row, 'total_customer', None)
-                print(f"DEBUG: Row total_customer attribute value: {total_cust_attr} (type: {type(total_cust_attr)})", flush=True)
-            
             if not row:
-                # No data found, return zeros
-                print("DEBUG: No row returned from query!", flush=True)
-                sys.stdout.flush()
                 return CampaignKPIData(
                     total_customer=0.0,
                     unit_per_transaction=0.0,
@@ -190,40 +148,15 @@ async def _get_kpi_data_optimized(
                     retention_rate=0.0,
                 )
             
-            # Get the count value - try multiple ways to access it
+            # Extract values
             total_customer_raw = getattr(row, 'total_customer', None)
             if total_customer_raw is None:
-                # Try accessing by index if it's a Row object
                 try:
                     total_customer_raw = row[0] if hasattr(row, '__getitem__') else None
                 except:
                     pass
             
             total_customer = float(total_customer_raw or 0)
-            
-            # Debug logging to verify count - use sys.stdout.flush() to ensure output appears
-            print(f"DEBUG: ========== KPI QUERY RESULT ==========", flush=True)
-            print(f"DEBUG: KPI query returned total_customer count: {total_customer:,}", flush=True)
-            print(f"DEBUG: Table has {total_table_rows:,} rows, filtered query returned {total_customer:,} rows", flush=True)
-            print(f"DEBUG: Filters applied: {filters}", flush=True)
-            print(f"DEBUG: Raw total_customer value: {total_customer_raw}", flush=True)
-            print(f"DEBUG: ======================================", flush=True)
-            sys.stdout.flush()
-            
-            # If count is exactly 10000, there might be a hidden limit
-            if total_customer == 10000 and total_table_rows > 10000:
-                print(f"⚠️  WARNING: Query returned exactly 10,000 rows but table has {total_table_rows:,} rows!")
-                print("⚠️  WARNING: There may be a LIMIT clause or view restriction we're not seeing.")
-                print("⚠️  WARNING: Check if crm_analysis_tcm is a view with a TOP/LIMIT clause")
-                print("⚠️  WARNING: OR there might be a default filter being applied incorrectly")
-                
-                # Try a direct count query with the same filters to see if it's a query issue
-                direct_count_query = text("SELECT COUNT(*) FROM crm_analysis_tcm")
-                # Apply filters manually to the raw SQL if needed
-                direct_count_result = await session.execute(direct_count_query)
-                direct_count = direct_count_result.scalar()
-                print(f"DEBUG: Direct COUNT(*) query returned: {direct_count:,}")
-            
             returning_customers = float(row.returning_customers or 0)
             customer_spending_avg = float(row.customer_spending or 0.0)
             
@@ -249,7 +182,13 @@ async def _get_kpi_data_optimized(
         # For 2.2M rows, COUNT queries can take 30-60 seconds even with indexes
         # Using 180 seconds (3 minutes) to handle very large datasets
         try:
-            return await asyncio.wait_for(_execute_kpi_query(), timeout=180.0)  # 3 minutes for very large datasets
+            # Reduced timeout to 45 seconds - fail fast, cache will handle subsequent requests
+            import time
+            start = time.time()
+            result = await asyncio.wait_for(_execute_kpi_query(), timeout=45.0)
+            elapsed = time.time() - start
+            print(f"⏱️  KPI query completed in {elapsed:.2f} seconds")
+            return result
         except (AsyncTimeoutError, asyncio.TimeoutError):
             print("⚠️  WARNING: KPI query timed out after 180 seconds, returning default values", flush=True)
             print("⚠️  This may indicate missing indexes or database performance issues", flush=True)
@@ -284,15 +223,27 @@ async def _get_r_score_data_optimized(
 ) -> list[ChartDataPoint]:
     """Optimized R score distribution using indexed R_SCORE column."""
     
-    query = select(
-        InvCrmAnalysisTcm.r_score,
-        func.count(InvCrmAnalysisTcm.cust_mobileno).label("count")
-    )
-    
-    query = _apply_base_filters(query, filters)
-    query = query.group_by(InvCrmAnalysisTcm.r_score).order_by(InvCrmAnalysisTcm.r_score)
-    
-    results = (await session.execute(query)).all()
+    try:
+        query = select(
+            InvCrmAnalysisTcm.r_score,
+            func.count(InvCrmAnalysisTcm.cust_mobileno).label("count")
+        )
+        
+        query = _apply_base_filters(query, filters)
+        query = query.group_by(InvCrmAnalysisTcm.r_score).order_by(InvCrmAnalysisTcm.r_score)
+        
+        # Add timeout to prevent blocking
+        result = await asyncio.wait_for(
+            session.execute(query),
+            timeout=60.0
+        )
+        results = result.all()
+    except (AsyncTimeoutError, asyncio.TimeoutError):
+        print("⚠️  WARNING: R score query timed out, returning empty array", flush=True)
+        return []
+    except Exception as e:
+        print(f"⚠️  WARNING: R score query failed: {e}, returning empty array", flush=True)
+        return []
     
     score_labels = {
         1: "Least Recent",
@@ -352,15 +303,26 @@ async def _get_m_score_data_optimized(
 ) -> list[ChartDataPoint]:
     """Optimized M score distribution using indexed M_SCORE column."""
     
-    query = select(
-        InvCrmAnalysisTcm.m_score,
-        func.count(InvCrmAnalysisTcm.cust_mobileno).label("count")
-    )
-    
-    query = _apply_base_filters(query, filters)
-    query = query.group_by(InvCrmAnalysisTcm.m_score).order_by(InvCrmAnalysisTcm.m_score)
-    
-    results = (await session.execute(query)).all()
+    try:
+        query = select(
+            InvCrmAnalysisTcm.m_score,
+            func.count(InvCrmAnalysisTcm.cust_mobileno).label("count")
+        )
+        
+        query = _apply_base_filters(query, filters)
+        query = query.group_by(InvCrmAnalysisTcm.m_score).order_by(InvCrmAnalysisTcm.m_score)
+        
+        result = await asyncio.wait_for(
+            session.execute(query),
+            timeout=60.0
+        )
+        results = result.all()
+    except (AsyncTimeoutError, asyncio.TimeoutError):
+        print("⚠️  WARNING: M score query timed out, returning empty array", flush=True)
+        return []
+    except Exception as e:
+        print(f"⚠️  WARNING: M score query failed: {e}, returning empty array", flush=True)
+        return []
     
     return [
         ChartDataPoint(
@@ -778,13 +740,15 @@ async def get_campaign_dashboard_optimized(
     FORCE_CACHE_BYPASS = False  # Re-enabled caching for better performance
     
     # Try to get from cache (aggressive caching for <1 second response)
-    # cached_result = None if FORCE_CACHE_BYPASS else await get_cache(cache_key)
+    import time
+    cache_start = time.time()
     cached_result = await get_cache(cache_key)
+    cache_check_time = time.time() - cache_start
+    
     if cached_result:
         # Return cached result immediately (<100ms response)
-        # Refresh in background if cache is getting stale
         asyncio.create_task(_refresh_cache_if_stale(session, filters, cache_key, stale_cache_key))
-        print(f"DEBUG: Returning cached result (total_customer: {cached_result.get('kpi', {}).get('total_customer', 'N/A')})")
+        print(f"✅ Cache HIT! Returning in {cache_check_time:.3f}s (total_customer: {cached_result.get('kpi', {}).get('total_customer', 'N/A')})")
         return CampaignDashboardOut(**cached_result)
     
     # Try stale cache if fresh cache miss (stale-while-revalidate pattern)
@@ -792,12 +756,19 @@ async def get_campaign_dashboard_optimized(
     if stale_result:
         # Return stale cache immediately, refresh in background
         asyncio.create_task(_refresh_cache_background(session, filters, cache_key, stale_cache_key, request, user))
+        print(f"✅ Stale cache HIT! Returning in {cache_check_time:.3f}s, refreshing in background")
         return CampaignDashboardOut(**stale_result)
+    
+    print(f"❌ Cache MISS (checked in {cache_check_time:.3f}s) - querying database (this will take ~90s for first request)")
     
     try:
         # Execute all queries in parallel for maximum performance
         # Use return_exceptions=True so one failure doesn't break everything
         # This allows charts to load even if KPI query is slow
+        import time
+        start_time = time.time()
+        print(f"⏱️  Starting parallel query execution at {time.strftime('%H:%M:%S')}")
+        
         results = await asyncio.gather(
             _get_kpi_data_optimized(session, filters),
             _get_r_score_data_optimized(session, filters),
@@ -811,6 +782,9 @@ async def get_campaign_dashboard_optimized(
             _get_fiscal_year_data_optimized(session, filters),
             return_exceptions=True,  # Don't fail entire request if one query fails
         )
+        
+        elapsed = time.time() - start_time
+        print(f"⏱️  All queries completed in {elapsed:.2f} seconds")
         
         # Extract results with error handling
         kpi_data = results[0] if not isinstance(results[0], Exception) else None
