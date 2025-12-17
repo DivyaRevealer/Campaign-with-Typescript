@@ -135,28 +135,29 @@ async def _get_kpi_data_optimized(
             
             # Single query to get all KPI metrics at once (much faster than multiple queries)
             # Use indexed columns for better performance
-            # IMPORTANT: Start with the table first, then build the select to ensure filters work
-            base_query = select(InvCrmAnalysisTcm)
+            # CRITICAL: Build query properly to ensure WHERE clauses are applied
             
             # Debug: Print filters before applying
             print(f"DEBUG: Filters dict before applying to KPI query: {filters}", flush=True)
             print(f"DEBUG: start_date in filters: {filters.get('start_date')}", flush=True)
             print(f"DEBUG: end_date in filters: {filters.get('end_date')}", flush=True)
             
-            # Apply filters FIRST to establish the base query with WHERE clause
-            base_query = _apply_base_filters(base_query, filters)
-            
-            # Now build the aggregation query FROM the filtered base query
-            # This ensures the WHERE clause is preserved
+            # Build query with column references - SQLAlchemy will infer the table
+            # This pattern works for other queries like _get_days_to_return_bucket_data_optimized
             query = select(
-                func.count(1).label("total_customer"),  # Count all rows - optimized by MySQL
+                func.count(InvCrmAnalysisTcm.cust_mobileno).label("total_customer"),  # Use column reference
                 func.avg(InvCrmAnalysisTcm.no_of_items).label("unit_per_transaction"),
                 func.avg(InvCrmAnalysisTcm.total_sales).label("customer_spending"),
                 func.avg(InvCrmAnalysisTcm.days).label("days_to_return"),
                 func.sum(case((InvCrmAnalysisTcm.f_score > 1, 1), else_=0)).label("returning_customers"),
                 func.sum(InvCrmAnalysisTcm.total_sales).label("total_sales_sum"),
                 func.count(InvCrmAnalysisTcm.total_sales).label("sales_count"),
-            ).select_from(base_query.subquery())
+            )
+            
+            # Apply filters - this MUST add WHERE clauses
+            print(f"DEBUG: Query before applying filters: {str(query)}", flush=True)
+            query = _apply_base_filters(query, filters)
+            print(f"DEBUG: Query after applying filters: {str(query)}", flush=True)
             
             # Log the actual SQL query being executed for debugging
             compiled_query = str(query.compile(compile_kwargs={"literal_binds": True}))

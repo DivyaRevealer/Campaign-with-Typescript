@@ -102,85 +102,6 @@ const renderSegmentTreemapContent = (props: any) => {
 };
 
 
-// Mock data - Fallback when API is not available
-const mockKPIData: CampaignKPIData = {
-  total_customer: 10000,
-  unit_per_transaction: 10.81,
-  profit_per_customer: 0.0,
-  customer_spending: 76892.34,
-  days_to_return: 142.93,
-  retention_rate: 39.81,
-};
-
-const mockRScoreData: ChartDataPoint[] = [
-  { name: "Bought Most Recently", value: 8500, count: 8500 },
-  { name: "Other", value: 1500, count: 1500 },
-];
-
-const mockFScoreData: ChartDataPoint[] = [
-  { name: "2", value: 624, count: 624 },
-  { name: "3", value: 738, count: 738 },
-  { name: "4", value: 1028, count: 1028 },
-  { name: "More Frequent Visit", value: 1600, count: 1600 },
-  { name: "Most Rarest Visit", value: 6010, count: 6010 },
-];
-
-const mockMScoreData: ChartDataPoint[] = [
-  { name: "Category 1", value: 3198, count: 3198 },
-  { name: "Category 2", value: 1702, count: 1702 },
-  { name: "Category 3", value: 1771, count: 1771 },
-  { name: "Category 4", value: 1615, count: 1615 },
-  { name: "Category 5", value: 1714, count: 1714 },
-];
-
-const mockRValueBucketData: ChartDataPoint[] = [
-  { name: "1-200", value: 9500 },
-  { name: "200-400", value: 300 },
-  { name: "400-600", value: 100 },
-  { name: "600-800", value: 50 },
-  { name: "800-1000", value: 30 },
-  { name: ">1000", value: 20 },
-];
-
-const mockVisitsData: ChartDataPoint[] = [
-  { name: "1", value: 6019 },
-  { name: "2", value: 2000 },
-  { name: "3", value: 1200 },
-  { name: "4", value: 500 },
-  { name: "5", value: 200 },
-  { name: "6", value: 100 },
-];
-
-const mockValueData: ChartDataPoint[] = [
-  { name: "1-1000", value: 1500 },
-  { name: "1000-2000", value: 1200 },
-  { name: "2000-3000", value: 1000 },
-  { name: "3000-4000", value: 800 },
-  { name: "4000-5000", value: 600 },
-  { name: ">5000", value: 5974 },
-];
-
-const mockSegmentData: SegmentDataPoint[] = [
-  { name: "POTENTIAL LOYALISTS", value: 4500, fill: "#7dd3fc" },
-  { name: "NEW CUSTOMERS", value: 1800, fill: "#1e40af" },
-  { name: "CHAMPIONS", value: 2200, fill: "#22c55e" },
-  { name: "NEED ATTENTION", value: 1500, fill: "#2dd4bf" },
-];
-
-const mockDaysToReturnBucketData: DaysToReturnBucketData[] = [
-  { name: "1-2 Month", count: 6800 },
-  { name: "3-6 Month", count: 850 },
-  { name: "1-2 Yr", count: 920 },
-  { name: ">2 Yr", count: 1430 },
-];
-
-const mockFiscalYearData: FiscalYearData[] = [
-  { year: "2020", new_customer_percent: 100, old_customer_percent: 0 },
-  { year: "2021", new_customer_percent: 78, old_customer_percent: 22 },
-  { year: "2022", new_customer_percent: 48, old_customer_percent: 52 },
-  { year: "2023", new_customer_percent: 50, old_customer_percent: 50 },
-  { year: "2024", new_customer_percent: 55, old_customer_percent: 45 },
-];
 
 const CalendarIcon = memo(() => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -264,16 +185,25 @@ export default function CampaignDashboard() {
   const [applyingFilters, setApplyingFilters] = useState(false); // Separate state for filter application
   const [filtersLoading, setFiltersLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [kpiData, setKpiData] = useState<CampaignKPIData>(mockKPIData);
-  const [rScoreData, setRScoreData] = useState<ChartDataPoint[]>(mockRScoreData);
-  const [fScoreData, setFScoreData] = useState<ChartDataPoint[]>(mockFScoreData);
-  const [mScoreData, setMScoreData] = useState<ChartDataPoint[]>(mockMScoreData);
-  const [rValueBucketData, setRValueBucketData] = useState<ChartDataPoint[]>(mockRValueBucketData);
-  const [visitsData, setVisitsData] = useState<ChartDataPoint[]>(mockVisitsData);
-  const [valueData, setValueData] = useState<ChartDataPoint[]>(mockValueData);
-  const [segmentData, setSegmentData] = useState<SegmentDataPoint[]>(mockSegmentData);
-  const [daysToReturnBucketData, setDaysToReturnBucketData] = useState<DaysToReturnBucketData[]>(mockDaysToReturnBucketData);
-  const [fiscalYearData, setFiscalYearData] = useState<FiscalYearData[]>(mockFiscalYearData);
+  // Initialize with empty/default values - NOT mock data
+  // State will be updated from API response
+  const [kpiData, setKpiData] = useState<CampaignKPIData>({
+    total_customer: 0,
+    unit_per_transaction: 0,
+    profit_per_customer: 0,
+    customer_spending: 0,
+    days_to_return: 0,
+    retention_rate: 0,
+  });
+  const [rScoreData, setRScoreData] = useState<ChartDataPoint[]>([]);
+  const [fScoreData, setFScoreData] = useState<ChartDataPoint[]>([]);
+  const [mScoreData, setMScoreData] = useState<ChartDataPoint[]>([]);
+  const [rValueBucketData, setRValueBucketData] = useState<ChartDataPoint[]>([]);
+  const [visitsData, setVisitsData] = useState<ChartDataPoint[]>([]);
+  const [valueData, setValueData] = useState<ChartDataPoint[]>([]);
+  const [segmentData, setSegmentData] = useState<SegmentDataPoint[]>([]);
+  const [daysToReturnBucketData, setDaysToReturnBucketData] = useState<DaysToReturnBucketData[]>([]);
+  const [fiscalYearData, setFiscalYearData] = useState<FiscalYearData[]>([]);
   const [chartsReady, setChartsReady] = useState(false);
   const dashboardRequestRef = useRef<AbortController | null>(null);
   const initialLoadDoneRef = useRef(false); // Track if initial load is complete
@@ -299,7 +229,6 @@ export default function CampaignDashboard() {
   };
 
   const loadDashboardData = useCallback(async (filterParams?: CampaignDashboardFilters, isFilterApplication: boolean = false) => {
-    // Don't block UI - show mock data immediately, update later
     setError(null);
     
     // Only set applyingFilters if this is a filter application, not initial load
@@ -314,53 +243,109 @@ export default function CampaignDashboard() {
     const controller = new AbortController();
     dashboardRequestRef.current = controller;
     
-    // Log for debugging (can be removed in production)
-    console.log("Loading dashboard data with filters:", filterParams || "no filters (initial load)");
+    // Log for debugging
+    console.log("🔵 [Dashboard] Loading dashboard data with filters:", filterParams || "no filters (initial load)");
 
     try {
       const response = await getCampaignDashboard(filterParams, controller.signal);
       
-      // Debug logging to verify API response
-      console.log("DEBUG: API Response received - Total Customer:", response.kpi?.total_customer);
-      console.log("DEBUG: Full KPI data:", response.kpi);
+      // Comprehensive debug logging to verify API response
+      console.log("✅ [Dashboard] API Response received successfully");
+      console.log("✅ [Dashboard] KPI - Total Customer:", response.kpi?.total_customer);
+      console.log("✅ [Dashboard] KPI - Full data:", JSON.stringify(response.kpi, null, 2));
+      console.log("✅ [Dashboard] R Score Data length:", response.r_score_data?.length || 0);
+      console.log("✅ [Dashboard] F Score Data length:", response.f_score_data?.length || 0);
+      console.log("✅ [Dashboard] M Score Data length:", response.m_score_data?.length || 0);
+      console.log("✅ [Dashboard] Segment Data length:", response.segment_data?.length || 0);
+      console.log("✅ [Dashboard] Full Response:", JSON.stringify(response, null, 2));
       
-      // Update all data from response
-      setKpiData(response.kpi);
-      setRScoreData(response.r_score_data);
-      setFScoreData(response.f_score_data);
-      setMScoreData(response.m_score_data);
-      setRValueBucketData(response.r_value_bucket_data);
-      setVisitsData(response.visits_data);
-      setValueData(response.value_data);
-      setSegmentData(response.segment_data);
-      setDaysToReturnBucketData(response.days_to_return_bucket_data);
-      setFiscalYearData(response.fiscal_year_data);
+      // Validate and update all data from response with null checks
+      if (response.kpi) {
+        console.log("✅ [Dashboard] Updating KPI data:", response.kpi);
+        setKpiData(response.kpi);
+      } else {
+        console.warn("⚠️ [Dashboard] KPI data is missing in response");
+      }
+      
+      if (response.r_score_data && Array.isArray(response.r_score_data)) {
+        console.log("✅ [Dashboard] Updating R Score data, count:", response.r_score_data.length);
+        setRScoreData(response.r_score_data);
+      } else {
+        console.warn("⚠️ [Dashboard] R Score data is missing or invalid");
+        setRScoreData([]);
+      }
+      
+      if (response.f_score_data && Array.isArray(response.f_score_data)) {
+        console.log("✅ [Dashboard] Updating F Score data, count:", response.f_score_data.length);
+        setFScoreData(response.f_score_data);
+      } else {
+        console.warn("⚠️ [Dashboard] F Score data is missing or invalid");
+        setFScoreData([]);
+      }
+      
+      if (response.m_score_data && Array.isArray(response.m_score_data)) {
+        console.log("✅ [Dashboard] Updating M Score data, count:", response.m_score_data.length);
+        setMScoreData(response.m_score_data);
+      } else {
+        console.warn("⚠️ [Dashboard] M Score data is missing or invalid");
+        setMScoreData([]);
+      }
+      
+      if (response.r_value_bucket_data && Array.isArray(response.r_value_bucket_data)) {
+        setRValueBucketData(response.r_value_bucket_data);
+      } else {
+        setRValueBucketData([]);
+      }
+      
+      if (response.visits_data && Array.isArray(response.visits_data)) {
+        setVisitsData(response.visits_data);
+      } else {
+        setVisitsData([]);
+      }
+      
+      if (response.value_data && Array.isArray(response.value_data)) {
+        setValueData(response.value_data);
+      } else {
+        setValueData([]);
+      }
+      
+      if (response.segment_data && Array.isArray(response.segment_data)) {
+        console.log("✅ [Dashboard] Updating Segment data, count:", response.segment_data.length);
+        setSegmentData(response.segment_data);
+      } else {
+        console.warn("⚠️ [Dashboard] Segment data is missing or invalid");
+        setSegmentData([]);
+      }
+      
+      if (response.days_to_return_bucket_data && Array.isArray(response.days_to_return_bucket_data)) {
+        setDaysToReturnBucketData(response.days_to_return_bucket_data);
+      } else {
+        setDaysToReturnBucketData([]);
+      }
+      
+      if (response.fiscal_year_data && Array.isArray(response.fiscal_year_data)) {
+        setFiscalYearData(response.fiscal_year_data);
+      } else {
+        setFiscalYearData([]);
+      }
+      
+      console.log("✅ [Dashboard] All state updated successfully from API response");
       
       // Clear any previous errors since we got a successful response
       setError(null);
     } catch (err) {
       if (controller.signal.aborted) {
+        console.log("🟡 [Dashboard] Request was aborted");
         return;
       }
       const errorMsg = extractApiErrorMessage(err, "Failed to load dashboard data");
+      console.error("❌ [Dashboard] Error loading dashboard data:", errorMsg, err);
       
-      // Check if we have any chart data loaded (from previous successful load or partial response)
-      const hasChartData = rScoreData.length > 0 || segmentData.length > 0 || 
-                          fScoreData.length > 0 || visitsData.length > 0;
-      
-      // Only show error if it's a critical error and no charts are displayed
-      // If charts are already loaded, don't show error (KPI will use default/mock values)
-      if (errorMsg.includes("timeout") && hasChartData) {
-        // Charts are displayed, KPI might have timed out - don't show error
-        console.warn("KPI data may have timed out, but charts are displayed. KPI boxes will show default values.");
-        setError(null); // Don't show error if charts are working
-      } else {
-        setError(errorMsg);
-        console.error("Failed to load dashboard data:", err);
-      }
+      // Always show error - don't try to use stale state values
+      setError(errorMsg);
       
       if (errorMsg.includes("timeout") || errorMsg.includes("aborted")) {
-        console.warn("Dashboard data request timed out - some data may be missing");
+        console.warn("⚠️ [Dashboard] Request timed out or was aborted");
       }
     } finally {
       if (!controller.signal.aborted) {
@@ -371,7 +356,7 @@ export default function CampaignDashboard() {
         }
       }
     }
-  }, []);
+  }, []); // Empty deps is OK - we're using setState functions which are stable
 
   const loadFilterOptions = useCallback(async () => {
     setFiltersLoading(true);
