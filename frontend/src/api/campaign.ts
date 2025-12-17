@@ -296,9 +296,9 @@ export const getCampaignDashboard = (
   
   const queryString = params.toString();
   const url = `/campaign/dashboard${queryString ? `?${queryString}` : ""}`;
-  // Timeout: 30 seconds for first request (cache building), <1 second for cached requests
-  // First request builds cache (3-10 seconds), subsequent requests are <100ms from cache
-  return http.get<CampaignDashboardOut>(url, { timeout: 30000, signal }).then((r) => r.data);
+  // Timeout: 180 seconds (3 minutes) to match backend KPI query timeout
+  // First request may take 30-180 seconds for large datasets, subsequent requests are <100ms from cache
+  return http.get<CampaignDashboardOut>(url, { timeout: 180000, signal }).then((r) => r.data);
 };
 
 export const getCampaignDashboardFilters = (): Promise<FilterOptions> => {

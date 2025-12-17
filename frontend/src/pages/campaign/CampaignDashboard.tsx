@@ -245,9 +245,41 @@ export default function CampaignDashboard() {
     
     // Log for debugging
     console.log("🔵 [Dashboard] Loading dashboard data with filters:", filterParams || "no filters (initial load)");
+    
+    // Log the actual API URL that will be called
+    const apiUrl = filterParams 
+      ? `/campaign/dashboard?${new URLSearchParams({
+          ...(filterParams.start_date && { start_date: filterParams.start_date }),
+          ...(filterParams.end_date && { end_date: filterParams.end_date }),
+          ...(filterParams.customer_mobile && { customer_mobile: filterParams.customer_mobile }),
+          ...(filterParams.customer_name && { customer_name: filterParams.customer_name }),
+          ...(filterParams.r_value_bucket && { r_value_bucket: filterParams.r_value_bucket }),
+          ...(filterParams.f_value_bucket && { f_value_bucket: filterParams.f_value_bucket }),
+          ...(filterParams.m_value_bucket && { m_value_bucket: filterParams.m_value_bucket }),
+        }).toString()}`
+      : "/campaign/dashboard";
+    console.log("🔵 [Dashboard] API URL:", apiUrl);
 
+    // Show a progress indicator for long-running requests
+    let progressInterval: ReturnType<typeof setInterval> | null = null;
+    
     try {
+      console.log("🔵 [Dashboard] Making API call to getCampaignDashboard...");
+      console.log("🔵 [Dashboard] Note: First request may take 30-180 seconds for large datasets. Subsequent requests will be cached (<1 second).");
+      
+      // Log progress every 10 seconds for long-running requests
+      progressInterval = setInterval(() => {
+        console.log("⏳ [Dashboard] Still loading... This may take up to 3 minutes for the first request.");
+      }, 10000);
+      
       const response = await getCampaignDashboard(filterParams, controller.signal);
+      
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
+      
+      console.log("🔵 [Dashboard] API call completed, response received");
       
       // Comprehensive debug logging to verify API response
       console.log("✅ [Dashboard] API Response received successfully");
@@ -334,12 +366,24 @@ export default function CampaignDashboard() {
       // Clear any previous errors since we got a successful response
       setError(null);
     } catch (err) {
+      // Clear progress interval on error
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
       if (controller.signal.aborted) {
         console.log("🟡 [Dashboard] Request was aborted");
         return;
       }
       const errorMsg = extractApiErrorMessage(err, "Failed to load dashboard data");
-      console.error("❌ [Dashboard] Error loading dashboard data:", errorMsg, err);
+      // Safely log error - convert error object to string to avoid "Cannot convert object to primitive value"
+      const errorDetails = err instanceof Error 
+        ? `${err.name}: ${err.message}` 
+        : typeof err === 'object' 
+          ? JSON.stringify(err, Object.getOwnPropertyNames(err), 2)
+          : String(err);
+      console.error("❌ [Dashboard] Error loading dashboard data:", errorMsg);
+      console.error("❌ [Dashboard] Error details:", errorDetails);
       
       // Always show error - don't try to use stale state values
       setError(errorMsg);
@@ -371,7 +415,13 @@ export default function CampaignDashboard() {
       console.log("Filter options loaded from database:", options);
       setFilterOptions(options);
     } catch (err) {
-      console.error("Failed to load filter options from database:", err);
+      // Safely log error - convert error object to string to avoid "Cannot convert object to primitive value"
+      const errorDetails = err instanceof Error 
+        ? `${err.name}: ${err.message}` 
+        : typeof err === 'object' 
+          ? JSON.stringify(err, Object.getOwnPropertyNames(err), 2)
+          : String(err);
+      console.error("Failed to load filter options from database:", errorDetails);
       // Continue with empty options - filters will just be empty
       // Don't block the page - allow user to use dashboard without filters
       setFilterOptions({

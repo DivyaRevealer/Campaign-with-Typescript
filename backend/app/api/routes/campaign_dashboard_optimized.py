@@ -775,12 +775,13 @@ async def get_campaign_dashboard_optimized(
     cache_key = generate_cache_key("campaign_dashboard", **filters)
     stale_cache_key = f"{cache_key}:stale"
     
-    # TEMPORARY: Force cache bypass to debug 10,000 row issue
-    # TODO: Remove this after fixing the count issue
-    FORCE_CACHE_BYPASS = True  # Set to False to re-enable caching
+    # Cache bypass disabled - re-enable caching for performance
+    # First request will take longer (30-180s), subsequent requests will be <100ms from cache
+    FORCE_CACHE_BYPASS = False  # Re-enabled caching for better performance
     
     # Try to get from cache (aggressive caching for <1 second response)
-    cached_result = None if FORCE_CACHE_BYPASS else await get_cache(cache_key)
+    # cached_result = None if FORCE_CACHE_BYPASS else await get_cache(cache_key)
+    cached_result = await get_cache(cache_key)
     if cached_result:
         # Return cached result immediately (<100ms response)
         # Refresh in background if cache is getting stale
