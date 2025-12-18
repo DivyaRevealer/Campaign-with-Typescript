@@ -48,6 +48,7 @@
   gap: 8px;
   width: 100%;
   align-items: flex-end;
+  justify-content: flex-start;
 }
 
 .filter-group,
@@ -56,6 +57,7 @@
   flex-direction: column;
   gap: 8px;
   flex: 0 0 auto;
+  min-width: 0;
 }
 
 /* Date fields - 80px width */
@@ -68,10 +70,19 @@
   flex: 0 0 140px;
 }
 
-/* Select dropdowns - 150px width (increased to prevent text wrapping) */
+/* Select dropdowns - 130px width (adjusted to fit Apply button) */
 .filter-group.filter-item.select-field {
+  flex: 0 0 130px;
+  min-width: 130px;
+  max-width: 130px;
+}
+
+/* State dropdown - slightly wider to accommodate longer state names like "TAMIL NADU" */
+/* Target the first select-field in the filter-row (which is the State dropdown) */
+.filter-row > .filter-group.filter-item.select-field:first-of-type {
   flex: 0 0 150px;
   min-width: 150px;
+  max-width: 150px;
 }
 
 /* Multi-select component - matching Ant Design Select appearance */
@@ -80,6 +91,7 @@
   width: 100%;
   flex-shrink: 0;
   z-index: 1;
+  max-width: 100%;
 }
 
 .multi-select-wrapper.open {
@@ -193,6 +205,7 @@
   flex: 0 0 auto;
   min-width: auto;
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 .filter-group label,
@@ -294,9 +307,12 @@
 .kpi-cards,
 .metrics {
   display: grid;
-  grid-template-columns: repeat(6, minmax(180px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(5, minmax(200px, 1fr));
+  gap: 12px;
   margin-bottom: 24px;
+  max-width: 1360px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .kpi-card,
@@ -339,20 +355,23 @@
   justify-content: center;
   align-items: flex-start;
   text-align: left;
-  overflow: hidden;
+  overflow: visible;
   white-space: nowrap;
   text-overflow: ellipsis;
-  border-radius: 10px;
-  padding: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  height: 100px;
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: 90px;
+  min-height: 90px;
   color: #fff;
   position: relative;
 }
 
 .metric-card-total {
-  background: url('/images/tile_background.png') no-repeat right center;
+  background: url('/images/tile_background.png') no-repeat right bottom;
   background-size: cover;
+  background-position: right 0% bottom -10px;
+  background-color: #14b8a6;
 }
 
 .metric-card-total_retention {
@@ -386,9 +405,11 @@
 .metric-card-total_spending h4,
 .metric-card-total_return h4,
 .metric-card-total_retention h4 {
-  font-size: 0.95rem;
-  margin: 0 0 6px;
+  font-size: 0.85rem;
+  margin: 0 0 4px;
   color: #fff;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
 .metric-card-total p,
@@ -398,9 +419,10 @@
 .metric-card-total_return p,
 .metric-card-total_retention p {
   margin: 0;
-  font-size: 1rem;
-  font-weight: bold;
+  font-size: 1.1rem;
+  font-weight: 700;
   color: #fff;
+  line-height: 1.2;
 }
 
 /* Alternative Metric Cards */

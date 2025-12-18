@@ -7,7 +7,6 @@ import {
   Bar,
   LineChart,
   Line,
-  Treemap,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -63,41 +62,85 @@ const GRADIENTS = [
   { id: "grad6", start: "#1fa2ff", end: "#12d8fa" }
 ];
 
-const renderSegmentTreemapContent = (props: any) => {
-  const { x, y, width, height, name, value, fill } = props;
-  const centerX = x + width / 2;
-  const centerY = y + height / 2;
-  const headingSize = Math.max(Math.min(width / 10, 14), 9);
-  const valueSize = Math.max(Math.min(width / 14, 12), 9);
-
+// Custom Funnel Chart Component
+const FunnelChart: React.FC<{ data: SegmentDataPoint[] }> = ({ data }) => {
+  // Sort data by value descending for funnel visualization (largest at top)
+  const sortedData = [...data].sort((a, b) => b.value - a.value);
+  const totalSegments = sortedData.length;
+  
   return (
-    <g>
-      <rect x={x} y={y} width={width} height={height} style={{ fill, stroke: "#fff", strokeWidth: 2 }} />
-      <text
-        x={centerX}
-        y={centerY - 4}
-        textAnchor="middle"
-        fill="#000"
-        stroke="none"
-        fontSize={headingSize}
-        fontWeight={40}
-        style={{ textShadow: "none" }}
-      >
-        {name}
-      </text>
-      <text
-        x={centerX}
-        y={centerY + 16}
-        textAnchor="middle"
-        fill="#000"
-        stroke="none"
-        fontSize={valueSize}
-        fontWeight={400}
-        style={{ textShadow: "none" }}
-      >
-        {value?.toLocaleString()}
-      </text>
-    </g>
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      gap: '1px', 
+      padding: '8px',
+      height: '100%',
+      justifyContent: 'flex-start',
+      alignItems: 'center',
+      overflow: 'hidden'
+    }}>
+      {sortedData.map((item, index) => {
+        // Calculate width percentage - largest at top (100%), smallest at bottom
+        // Create a smooth funnel shape
+        const positionRatio = index / (totalSegments - 1 || 1);
+        const widthPercentage = 100 - (positionRatio * 40); // Start at 100%, end at 60%
+        
+        return (
+          <div
+            key={item.name}
+            style={{
+              position: 'relative',
+              width: `${widthPercentage}%`,
+              minWidth: '180px',
+              height: '28px',
+              backgroundColor: item.fill || COLORS[index % COLORS.length],
+              borderRadius: '3px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0 10px',
+              color: '#fff',
+              fontWeight: 600,
+              fontSize: '11px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+              transition: 'all 0.3s ease',
+              border: '1px solid rgba(255,255,255,0.2)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.02)';
+              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.25)';
+              e.currentTarget.style.zIndex = '10';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
+              e.currentTarget.style.zIndex = '1';
+            }}
+          >
+            <span style={{ 
+              flex: 1, 
+              textOverflow: 'ellipsis', 
+              overflow: 'hidden', 
+              whiteSpace: 'nowrap',
+              textShadow: '1px 1px 2px rgba(0,0,0,0.6)',
+              fontWeight: 600,
+              fontSize: '11px'
+            }}>
+              {item.name}
+            </span>
+            <span style={{ 
+              marginLeft: '10px', 
+              fontWeight: 700,
+              fontSize: '11px',
+              textShadow: '1px 1px 2px rgba(0,0,0,0.6)',
+              whiteSpace: 'nowrap'
+            }}>
+              {item.value.toLocaleString()}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 };
 
@@ -375,6 +418,24 @@ export default function CampaignDashboard() {
         }
       } catch (err) {
         console.error("❌ [Filters] Failed to get store info:", err);
+      }
+    }
+    
+    // Handle city selection - auto-adjust states to match selected cities
+    if (field === "city" && selected.length > 0) {
+      try {
+        // Get filter options with city filter to find matching states
+        const options = await getCampaignDashboardFilters(
+          undefined, // no state filter yet
+          selected,  // city filter
+          undefined  // no store filter
+        );
+        if (options.states.length > 0) {
+          console.log(`✅ [Filters] Cities selected: auto-adjusting states to [${options.states.join(", ")}]`);
+          newState = options.states;
+        }
+      } catch (err) {
+        console.error("❌ [Filters] Failed to get states for cities:", err);
       }
     }
     
@@ -1036,7 +1097,7 @@ export default function CampaignDashboard() {
             <div className="chart-container">
               <h4>Total Customer by Recency Score</h4>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={rValueBucketData} layout="vertical" margin={{ top: 5, right: 10, left: 30, bottom: 5 }}>
+                <BarChart data={[...rValueBucketData].reverse()} layout="vertical" margin={{ top: 5, right: 50, left: 30, bottom: 5 }}>
                   <XAxis 
                     type="number" 
                     dataKey="value"
@@ -1061,11 +1122,54 @@ export default function CampaignDashboard() {
                       style: { textAnchor: 'middle' }
                     }}
                   />
-                  <Tooltip />
-                  <Bar dataKey="value" isAnimationActive={false}>
-                    {rValueBucketData.map((_, index) => (
-                      <Cell key={`cell-bar-r-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      padding: '10px 12px'
+                    }}
+                    cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
+                  />
+                  <Bar 
+                    dataKey="value" 
+                    isAnimationActive={false}
+                    radius={[0, 8, 8, 0]}
+                    barSize={20}
+                    style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
+                  >
+                    {[...rValueBucketData].reverse().map((_, index) => (
+                      <Cell 
+                        key={`cell-bar-r-${index}`} 
+                        fill={COLORS[index % COLORS.length]}
+                        style={{ 
+                          transition: 'opacity 0.2s',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={(e: any) => {
+                          if (e) {
+                            e.target.style.opacity = 0.8;
+                          }
+                        }}
+                        onMouseLeave={(e: any) => {
+                          if (e) {
+                            e.target.style.opacity = 1;
+                          }
+                        }}
+                      />
                     ))}
+                    <LabelList
+                      dataKey="value"
+                      position="right"
+                      offset={5}
+                      formatter={(v: any) => (typeof v === "number" ? v.toLocaleString() : v ?? "")}
+                      style={{ 
+                        fontSize: 11, 
+                        fill: "#333", 
+                        fontWeight: 600
+                      }}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -1075,7 +1179,7 @@ export default function CampaignDashboard() {
             <div className="chart-container">
               <h4>Total Customer by Frequency Score</h4>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={visitsData} layout="vertical" margin={{ top: 5, right: 10, left: 30, bottom: 5 }}>
+                <BarChart data={[...visitsData].reverse()} layout="vertical" margin={{ top: 5, right: 50, left: 30, bottom: 5 }}>
                   <XAxis
                     type="number"
                     dataKey="value"
@@ -1096,11 +1200,54 @@ export default function CampaignDashboard() {
                       style: { textAnchor: 'middle' }
                     }}
                   />
-                  <Tooltip />
-                  <Bar dataKey="value" isAnimationActive={false}>
-                    {visitsData.map((_, index) => (
-                      <Cell key={`cell-bar-v-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      padding: '10px 12px'
+                    }}
+                    cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
+                  />
+                  <Bar 
+                    dataKey="value" 
+                    isAnimationActive={false}
+                    radius={[0, 8, 8, 0]}
+                    barSize={20}
+                    style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
+                  >
+                    {[...visitsData].reverse().map((_, index) => (
+                      <Cell 
+                        key={`cell-bar-v-${index}`} 
+                        fill={COLORS[index % COLORS.length]}
+                        style={{ 
+                          transition: 'opacity 0.2s',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={(e: any) => {
+                          if (e) {
+                            e.target.style.opacity = 0.8;
+                          }
+                        }}
+                        onMouseLeave={(e: any) => {
+                          if (e) {
+                            e.target.style.opacity = 1;
+                          }
+                        }}
+                      />
                     ))}
+                    <LabelList
+                      dataKey="value"
+                      position="right"
+                      offset={5}
+                      formatter={(v: any) => (typeof v === "number" ? v.toLocaleString() : v ?? "")}
+                      style={{ 
+                        fontSize: 11, 
+                        fill: "#333", 
+                        fontWeight: 600
+                      }}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -1110,7 +1257,7 @@ export default function CampaignDashboard() {
             <div className="chart-container">
               <h4>Total Customer by Monetary Score</h4>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={valueData} layout="vertical" margin={{ top: 5, right: 10, left: 30, bottom: 5 }}>
+                <BarChart data={[...valueData].reverse()} layout="vertical" margin={{ top: 5, right: 50, left: 30, bottom: 5 }}>
                   <XAxis
                     type="number"
                     dataKey="value"
@@ -1131,11 +1278,54 @@ export default function CampaignDashboard() {
                       style: { textAnchor: 'middle' }
                     }}
                   />
-                  <Tooltip />
-                  <Bar dataKey="value" isAnimationActive={false}>
-                    {valueData.map((_, index) => (
-                      <Cell key={`cell-bar-val-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      padding: '10px 12px'
+                    }}
+                    cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
+                  />
+                  <Bar 
+                    dataKey="value" 
+                    isAnimationActive={false}
+                    radius={[0, 8, 8, 0]}
+                    barSize={20}
+                    style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
+                  >
+                    {[...valueData].reverse().map((_, index) => (
+                      <Cell 
+                        key={`cell-bar-val-${index}`} 
+                        fill={COLORS[index % COLORS.length]}
+                        style={{ 
+                          transition: 'opacity 0.2s',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={(e: any) => {
+                          if (e) {
+                            e.target.style.opacity = 0.8;
+                          }
+                        }}
+                        onMouseLeave={(e: any) => {
+                          if (e) {
+                            e.target.style.opacity = 1;
+                          }
+                        }}
+                      />
                     ))}
+                    <LabelList
+                      dataKey="value"
+                      position="right"
+                      offset={5}
+                      formatter={(v: any) => (typeof v === "number" ? v.toLocaleString() : v ?? "")}
+                      style={{ 
+                        fontSize: 11, 
+                        fill: "#333", 
+                        fontWeight: 600
+                      }}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -1150,42 +1340,9 @@ export default function CampaignDashboard() {
           <LazyChart>
             <div className="chart-container treemap">
               <h4>Total Customer by Segment</h4>
-              <ResponsiveContainer width="100%" height={220}>
-                <Treemap
-                  data={segmentData as any}
-                  dataKey="value"
-                  stroke="#fff"
-                  fill="#8884d8"
-                  isAnimationActive={false}
-                  content={renderSegmentTreemapContent}
-                >
-                  <Tooltip 
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        const titleCaseName = (data.name || '')
-                          .toLowerCase()
-                          .split(' ')
-                          .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-                          .join(' ');
-                        return (
-                          <div style={{
-                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                            padding: '8px 12px',
-                            border: '1px solid #ccc',
-                            borderRadius: '4px',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                          }}>
-                            <p style={{ margin: 0, fontWeight: 'bold', color: data.fill, fontSize: '12px' }}>{titleCaseName}</p>
-                            <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#333' }}>Count: {data.value?.toLocaleString()}</p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                </Treemap>
-              </ResponsiveContainer>
+              <div style={{ height: '220px', width: '100%', overflow: 'hidden' }}>
+                <FunnelChart data={segmentData} />
+              </div>
             </div>
           </LazyChart>
           <LazyChart>
@@ -1230,10 +1387,54 @@ export default function CampaignDashboard() {
               <h4>Days to Return Bucket</h4>
               <ResponsiveContainer width="100%" height={190}>
                 <BarChart data={daysToReturnBucketData} barSize={18} margin={{ top: 10, right: 12, left: 12, bottom: 8 }}>
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#1E8449" isAnimationActive={false}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" opacity={0.5} />
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{ fontSize: 10 }}
+                    axisLine={{ stroke: '#d0d0d0', strokeWidth: 1 }}
+                    tickLine={{ stroke: '#d0d0d0' }}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 10 }}
+                    axisLine={{ stroke: '#d0d0d0', strokeWidth: 1 }}
+                    tickLine={{ stroke: '#d0d0d0' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      padding: '10px 12px'
+                    }}
+                    cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
+                  />
+                  <Bar 
+                    dataKey="count" 
+                    isAnimationActive={false}
+                    radius={[8, 8, 0, 0]}
+                    style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
+                  >
+                    {daysToReturnBucketData.map((_, index) => (
+                      <Cell 
+                        key={`cell-bar-days-${index}`} 
+                        fill={COLORS[index % COLORS.length]}
+                        style={{ 
+                          transition: 'opacity 0.2s',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={(e: any) => {
+                          if (e) {
+                            e.target.style.opacity = 0.8;
+                          }
+                        }}
+                        onMouseLeave={(e: any) => {
+                          if (e) {
+                            e.target.style.opacity = 1;
+                          }
+                        }}
+                      />
+                    ))}
                     <LabelList
                       dataKey="count"
                       position="top"
