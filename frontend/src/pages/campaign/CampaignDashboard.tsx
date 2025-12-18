@@ -206,7 +206,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
             {options.length === 0 ? (
               <div className="multi-select-option disabled">No options available</div>
             ) : (
-              options.map((option) => (
+              // Remove duplicates from options array (in case backend returns duplicates)
+              Array.from(new Set(options)).map((option) => (
                 <div
                   key={option}
                   className={`multi-select-option ${selected.includes(option) ? "selected" : ""}`}
@@ -357,6 +358,14 @@ export default function CampaignDashboard() {
       console.log(`🟢 [Filters] Loading options with: state=[${newState.join(", ")}], city=[${newCity.join(", ")}], store=[${newStore.join(", ")}]`);
       console.log(`🟢 [Filters] Making API call to getCampaignDashboardFilters...`);
       
+      // Build URL for logging
+      const params = new URLSearchParams();
+      if (newCity.length > 0) {
+        newCity.forEach(c => params.append("city", c));
+      }
+      console.log(`🟢 [Filters] API URL: /campaign/dashboard/filters?${params.toString()}`);
+      
+      // Call API with increased timeout (30 seconds)
       const options = await getCampaignDashboardFilters(
         newState.length > 0 ? newState : undefined,
         newCity.length > 0 ? newCity : undefined,

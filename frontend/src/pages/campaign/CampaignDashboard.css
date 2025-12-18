@@ -68,9 +68,10 @@
   flex: 0 0 140px;
 }
 
-/* Select dropdowns - 130px width (reduced to fit apply button) */
+/* Select dropdowns - 150px width (increased to prevent text wrapping) */
 .filter-group.filter-item.select-field {
-  flex: 0 0 130px;
+  flex: 0 0 150px;
+  min-width: 150px;
 }
 
 /* Multi-select component - matching Ant Design Select appearance */
@@ -118,6 +119,9 @@
   font-size: 13px;
   flex: 1;
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .multi-select-dropdown {

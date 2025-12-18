@@ -56,6 +56,20 @@ ON crm_analysis_tcm(TOTAL_SALES);
 CREATE INDEX IF NOT EXISTS idx_crm_tcm_segment_map 
 ON crm_analysis_tcm(SEGMENT_MAP);
 
+-- Store location filters (for cascading filters)
+CREATE INDEX IF NOT EXISTS idx_crm_tcm_store_state 
+ON crm_analysis_tcm(LAST_IN_STORE_STATE);
+
+CREATE INDEX IF NOT EXISTS idx_crm_tcm_store_city 
+ON crm_analysis_tcm(LAST_IN_STORE_CITY);
+
+CREATE INDEX IF NOT EXISTS idx_crm_tcm_store_name 
+ON crm_analysis_tcm(LAST_IN_STORE_NAME);
+
+-- Composite index for store location filtering (optimizes cascading filter queries)
+CREATE INDEX IF NOT EXISTS idx_crm_tcm_store_location 
+ON crm_analysis_tcm(LAST_IN_STORE_STATE, LAST_IN_STORE_CITY, LAST_IN_STORE_NAME);
+
 -- 3. Composite Indexes for Common Filter Combinations
 -- ============================================================================
 

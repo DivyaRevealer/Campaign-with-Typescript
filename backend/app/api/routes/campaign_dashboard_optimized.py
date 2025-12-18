@@ -1038,6 +1038,7 @@ async def get_campaign_dashboard_filters_optimized(
         # This ensures states auto-adjust when cities are selected
         if effective_cities:
             # Cities selected: show only states that have those cities
+            # OPTIMIZED: Use LIMIT to prevent full table scan on large datasets
             states_query = select(InvCrmAnalysisTcm.last_in_store_state).distinct().where(
                 and_(
                     InvCrmAnalysisTcm.last_in_store_city.in_(effective_cities),
@@ -1048,7 +1049,7 @@ async def get_campaign_dashboard_filters_optimized(
             # If states were also selected, intersect with those (only show states that match both)
             if effective_states:
                 states_query = states_query.where(InvCrmAnalysisTcm.last_in_store_state.in_(effective_states))
-            states_query = states_query.order_by(InvCrmAnalysisTcm.last_in_store_state)
+            states_query = states_query.order_by(InvCrmAnalysisTcm.last_in_store_state).limit(100)  # Limit for performance
         else:
             # No cities selected: get all states, or filter by selected states
             states_query = select(InvCrmAnalysisTcm.last_in_store_state).distinct().where(
@@ -1062,8 +1063,9 @@ async def get_campaign_dashboard_filters_optimized(
             states_query = states_query.order_by(InvCrmAnalysisTcm.last_in_store_state)
         
         states_results = await session.execute(states_query)
-        states = sorted([str(row.last_in_store_state).strip() for row in states_results.all() if row.last_in_store_state])
-        print(f"🟢 [Filters] Found {len(states)} states")
+        # Deduplicate states (in case of any edge cases) and sort
+        states = sorted(list(set([str(row.last_in_store_state).strip() for row in states_results.all() if row.last_in_store_state])))
+        print(f"🟢 [Filters] Found {len(states)} unique states")
         
         # 3. Get distinct cities
         # Filter by effective states if any
@@ -1078,10 +1080,11 @@ async def get_campaign_dashboard_filters_optimized(
         if effective_cities:
             # If cities are selected, only show those cities
             cities_query = cities_query.where(InvCrmAnalysisTcm.last_in_store_city.in_(effective_cities))
-        cities_query = cities_query.order_by(InvCrmAnalysisTcm.last_in_store_city)
+        cities_query = cities_query.order_by(InvCrmAnalysisTcm.last_in_store_city).limit(500)  # Limit for performance
         cities_results = await session.execute(cities_query)
-        cities = sorted([str(row.last_in_store_city).strip() for row in cities_results.all() if row.last_in_store_city])
-        print(f"🟢 [Filters] Found {len(cities)} cities")
+        # Deduplicate cities (in case of any edge cases) and sort
+        cities = sorted(list(set([str(row.last_in_store_city).strip() for row in cities_results.all() if row.last_in_store_city])))
+        print(f"🟢 [Filters] Found {len(cities)} unique cities")
         
         # 4. Get distinct store names
         # Filter by effective states and cities
@@ -1100,8 +1103,9 @@ async def get_campaign_dashboard_filters_optimized(
             stores_query = stores_query.where(InvCrmAnalysisTcm.last_in_store_name.in_(selected_stores))
         stores_query = stores_query.order_by(InvCrmAnalysisTcm.last_in_store_name).limit(1000)  # Limit for performance
         stores_results = await session.execute(stores_query)
-        stores = sorted([str(row.last_in_store_name).strip() for row in stores_results.all() if row.last_in_store_name])
-        print(f"🟢 [Filters] Found {len(stores)} stores")
+        # Deduplicate stores (in case of any edge cases) and sort
+        stores = sorted(list(set([str(row.last_in_store_name).strip() for row in stores_results.all() if row.last_in_store_name])))
+        print(f"🟢 [Filters] Found {len(stores)} unique stores")
         
         # Get distinct segment maps
         segments_query = select(InvCrmAnalysisTcm.segment_map).distinct().where(

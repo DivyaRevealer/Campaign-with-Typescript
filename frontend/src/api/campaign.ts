@@ -331,7 +331,11 @@ export const getCampaignDashboardFilters = (
   }
   const queryString = params.toString();
   const url = `/campaign/dashboard/filters${queryString ? `?${queryString}` : ""}`;
-  return http.get<FilterOptions>(url, { timeout: 10000 }).then((r) => r.data);
+  console.log(`🟢 [API] Calling: ${url}`);
+  return http.get<FilterOptions>(url, { timeout: 30000 }).then((r) => {
+    console.log(`✅ [API] Response received for: ${url}`);
+    return r.data;
+  });
 };
 
 export const getStoreInfo = (store: string): Promise<{ state: string | null; city: string | null }> => {
