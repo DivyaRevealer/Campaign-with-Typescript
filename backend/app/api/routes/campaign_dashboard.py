@@ -27,14 +27,7 @@ router = APIRouter(prefix="/campaign", tags=["campaign-dashboard"])
 
 def _apply_base_filters(query, filters: dict):
     """Apply common filters to a query. Skip filters with value 'All' or empty."""
-    # Date filters
-    start_date = filters.get("start_date")
-    if start_date and start_date.strip():
-        query = query.where(InvCrmAnalysisTcm.first_in_date >= start_date)
-    
-    end_date = filters.get("end_date")
-    if end_date and end_date.strip():
-        query = query.where(InvCrmAnalysisTcm.first_in_date <= end_date)
+    # Date filters removed - start_date and end_date are no longer used in the UI
     
     # Customer filters - skip if "All" or empty
     customer_mobile = filters.get("customer_mobile")

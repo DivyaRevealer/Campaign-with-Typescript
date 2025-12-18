@@ -39,34 +39,7 @@ STALE_CACHE_TTL = 7200  # Serve stale cache for up to 2 hours while refreshing
 
 def _apply_base_filters(query, filters: dict):
     """Apply common filters to a query. Optimized with indexed columns."""
-    from datetime import datetime as dt
-    
-    # Date filters - use indexed FIRST_IN_DATE
-    start_date = filters.get("start_date")
-    if start_date and start_date.strip():
-        # Convert string to date object for proper comparison
-        try:
-            if isinstance(start_date, str):
-                start_date_obj = dt.strptime(start_date, "%Y-%m-%d").date()
-            else:
-                start_date_obj = start_date
-            query = query.where(InvCrmAnalysisTcm.first_in_date >= start_date_obj)
-        except Exception:
-            # Invalid date format - skip filter
-            pass
-    
-    end_date = filters.get("end_date")
-    if end_date and end_date.strip():
-        # Convert string to date object for proper comparison
-        try:
-            if isinstance(end_date, str):
-                end_date_obj = dt.strptime(end_date, "%Y-%m-%d").date()
-            else:
-                end_date_obj = end_date
-            query = query.where(InvCrmAnalysisTcm.first_in_date <= end_date_obj)
-        except Exception:
-            # Invalid date format - skip filter
-            pass
+    # Date filters removed - start_date and end_date are no longer used in the UI
     
     # Customer filters - use indexed columns
     customer_mobile = filters.get("customer_mobile")

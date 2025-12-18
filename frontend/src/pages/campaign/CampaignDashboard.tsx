@@ -973,6 +973,15 @@ export default function CampaignDashboard() {
         </div>
       )}
 
+      {/* Loading Overlay */}
+      {loading && (
+        <div className="dashboard-loader-overlay">
+          <div className="dashboard-loader">
+            <div className="loader-spinner"></div>
+            <p>Loading dashboard data...</p>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="kpi-cards metrics">
