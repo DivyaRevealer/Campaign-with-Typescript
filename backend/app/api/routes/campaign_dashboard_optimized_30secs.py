@@ -38,44 +38,35 @@ STALE_CACHE_TTL = 7200  # Serve stale cache for up to 2 hours while refreshing
 
 
 def _apply_base_filters(query, filters: dict):
-    """Apply common filters to a query. Optimized with indexed columns.
-    
-    IMPORTANT: Date filters are REQUIRED to prevent full table scans.
-    If dates are missing or invalid, this function will raise an exception.
-    """
+    """Apply common filters to a query. Optimized with indexed columns."""
     from datetime import datetime as dt
     
     # Date filters - use indexed FIRST_IN_DATE
-    # CRITICAL: Always require date filters to prevent full table scans
     start_date = filters.get("start_date")
-    if not start_date or not start_date.strip():
-        raise ValueError("start_date filter is required to prevent full table scan")
-    
-    # Convert string to date object for proper comparison
-    try:
-        if isinstance(start_date, str):
-            start_date_obj = dt.strptime(start_date.strip(), "%Y-%m-%d").date()
-        else:
-            start_date_obj = start_date
-        query = query.where(InvCrmAnalysisTcm.first_in_date >= start_date_obj)
-    except (ValueError, TypeError) as e:
-        # Invalid date format - raise error instead of silently skipping (prevents full table scan)
-        raise ValueError(f"Invalid start_date format '{start_date}'. Expected YYYY-MM-DD format. Error: {e}")
+    if start_date and start_date.strip():
+        # Convert string to date object for proper comparison
+        try:
+            if isinstance(start_date, str):
+                start_date_obj = dt.strptime(start_date, "%Y-%m-%d").date()
+            else:
+                start_date_obj = start_date
+            query = query.where(InvCrmAnalysisTcm.first_in_date >= start_date_obj)
+        except Exception:
+            # Invalid date format - skip filter
+            pass
     
     end_date = filters.get("end_date")
-    if not end_date or not end_date.strip():
-        raise ValueError("end_date filter is required to prevent full table scan")
-    
-    # Convert string to date object for proper comparison
-    try:
-        if isinstance(end_date, str):
-            end_date_obj = dt.strptime(end_date.strip(), "%Y-%m-%d").date()
-        else:
-            end_date_obj = end_date
-        query = query.where(InvCrmAnalysisTcm.first_in_date <= end_date_obj)
-    except (ValueError, TypeError) as e:
-        # Invalid date format - raise error instead of silently skipping (prevents full table scan)
-        raise ValueError(f"Invalid end_date format '{end_date}'. Expected YYYY-MM-DD format. Error: {e}")
+    if end_date and end_date.strip():
+        # Convert string to date object for proper comparison
+        try:
+            if isinstance(end_date, str):
+                end_date_obj = dt.strptime(end_date, "%Y-%m-%d").date()
+            else:
+                end_date_obj = end_date
+            query = query.where(InvCrmAnalysisTcm.first_in_date <= end_date_obj)
+        except Exception:
+            # Invalid date format - skip filter
+            pass
     
     # Customer filters - use indexed columns
     customer_mobile = filters.get("customer_mobile")
@@ -734,53 +725,13 @@ async def get_campaign_dashboard_optimized(
     """
     
     # Set default date range to last 3 months if no dates provided
-    # CRITICAL: Always set date filters to prevent full table scans
     today = datetime.now().date()
     three_months_ago = today - timedelta(days=90)
     
     # Normalize filters with default date range (last 3 months)
-    # Ensure dates are ALWAYS set (never None or empty) to prevent full table scans
-    normalized_start_date = start_date.strip() if start_date and start_date.strip() else None
-    normalized_end_date = end_date.strip() if end_date and end_date.strip() else None
-    
-    # Validate date formats if provided, otherwise use defaults
-    start_date_obj = None
-    end_date_obj = None
-    
-    if normalized_start_date:
-        try:
-            start_date_obj = datetime.strptime(normalized_start_date, "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid start_date format '{start_date}'. Expected YYYY-MM-DD format."
-            )
-    else:
-        normalized_start_date = three_months_ago.strftime("%Y-%m-%d")
-        start_date_obj = three_months_ago
-    
-    if normalized_end_date:
-        try:
-            end_date_obj = datetime.strptime(normalized_end_date, "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid end_date format '{end_date}'. Expected YYYY-MM-DD format."
-            )
-    else:
-        normalized_end_date = today.strftime("%Y-%m-%d")
-        end_date_obj = today
-    
-    # Ensure start_date <= end_date (compare date objects, not strings)
-    if start_date_obj > end_date_obj:
-        raise HTTPException(
-            status_code=400,
-            detail=f"start_date ({normalized_start_date}) must be less than or equal to end_date ({normalized_end_date})"
-        )
-    
     filters = {
-        "start_date": normalized_start_date,  # Always set (never None/empty)
-        "end_date": normalized_end_date,  # Always set (never None/empty)
+        "start_date": start_date if start_date and start_date.strip() else three_months_ago.strftime("%Y-%m-%d"),
+        "end_date": end_date if end_date and end_date.strip() else today.strftime("%Y-%m-%d"),
         "customer_mobile": customer_mobile if customer_mobile and customer_mobile != "All" and customer_mobile.strip() else None,
         "customer_name": customer_name if customer_name and customer_name != "All" and customer_name.strip() else None,
         "r_value_bucket": r_value_bucket if r_value_bucket and r_value_bucket != "All" and r_value_bucket.strip() else None,
@@ -788,7 +739,7 @@ async def get_campaign_dashboard_optimized(
         "m_value_bucket": m_value_bucket if m_value_bucket and m_value_bucket != "All" and m_value_bucket.strip() else None,
     }
     
-    # Date filters are now guaranteed to be set (prevents full table scans)
+    # Default date range is set to last 3 months if not provided
     
     # Generate cache key from filters
     cache_key = generate_cache_key("campaign_dashboard", **filters)
