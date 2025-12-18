@@ -19,7 +19,7 @@ import {
 import { 
   getCampaignDashboard,
   getCampaignDashboardFilters,
-  getStoreInfo,
+  getStoresInfo,
   type CampaignDashboardFilters, 
   type CampaignKPIData, 
   type ChartDataPoint,
@@ -34,9 +34,9 @@ import "./CampaignDashboard.css";
 
 // Types
 interface DashboardFilters {
-  state: string;
-  city: string;
-  store: string;
+  state: string[];  // Multi-select support
+  city: string[];  // Multi-select support
+  store: string[];  // Multi-select support
   segmentMap: string;
   rValueBucket: string;
   fValueBucket: string;
@@ -134,11 +134,106 @@ const LazyChart = memo(({ children, className = "" }: { children: React.ReactNod
 });
 LazyChart.displayName = "LazyChart";
 
+// Multi-Select Dropdown Component
+interface MultiSelectProps {
+  label: string;
+  options: string[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  disabled?: boolean;
+  placeholder?: string;
+}
+
+const MultiSelect: React.FC<MultiSelectProps> = ({
+  label,
+  options,
+  selected,
+  onChange,
+  disabled = false,
+  placeholder = "Select options...",
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleToggle = (value: string) => {
+    if (disabled) return;
+    const newSelected = selected.includes(value)
+      ? selected.filter((s) => s !== value)
+      : [...selected, value];
+    onChange(newSelected);
+  };
+
+  const handleClearAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange([]);
+  };
+
+  const displayText = selected.length === 0 
+    ? placeholder 
+    : selected.length === 1 
+    ? selected[0] 
+    : `${selected.length} selected`;
+
+  return (
+    <div className="filter-group filter-item select-field">
+      <label>{label}</label>
+      <div className="multi-select-wrapper" ref={dropdownRef}>
+        <div
+          className={`multi-select ${isOpen ? "open" : ""} ${disabled ? "disabled" : ""}`}
+          onClick={() => !disabled && setIsOpen(!isOpen)}
+        >
+          <span className="multi-select-display">{displayText}</span>
+          <span className="multi-select-arrow">{isOpen ? "▲" : "▼"}</span>
+          {selected.length > 0 && (
+            <span className="multi-select-clear" onClick={handleClearAll}>
+              ×
+            </span>
+          )}
+        </div>
+        {isOpen && !disabled && (
+          <div className="multi-select-dropdown">
+            {options.length === 0 ? (
+              <div className="multi-select-option disabled">No options available</div>
+            ) : (
+              options.map((option) => (
+                <div
+                  key={option}
+                  className={`multi-select-option ${selected.includes(option) ? "selected" : ""}`}
+                  onClick={() => handleToggle(option)}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(option)}
+                    onChange={() => handleToggle(option)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <span>{option}</span>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function CampaignDashboard() {
   const [filters, setFilters] = useState<DashboardFilters>({
-    state: "All",
-    city: "All",
-    store: "All",
+    state: [],  // Multi-select: empty array means "All"
+    city: [],  // Multi-select: empty array means "All"
+    store: [],  // Multi-select: empty array means "All"
     segmentMap: "All",
     rValueBucket: "All",
     fValueBucket: "All",
@@ -178,139 +273,149 @@ export default function CampaignDashboard() {
   const [chartsReady, setChartsReady] = useState(false);
   const dashboardRequestRef = useRef<AbortController | null>(null);
   const initialLoadDoneRef = useRef(false); // Track if initial load is complete
-  const handleFilterChange = (field: keyof DashboardFilters, value: string) => {
-    setFilters((prev) => {
-      const updated = { ...prev, [field]: value };
-      const currentState = prev.state;
+  const filtersRef = useRef(filters); // Keep a ref to current filters for async operations
+  
+  // Update ref whenever filters change
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
+  
+  /**
+   * CASCADING FILTER LOGIC:
+   * 1. State selected → filter cities and stores by those states
+   * 2. City selected → filter stores by those cities, auto-adjust states to match
+   * 3. Store selected → auto-adjust states and cities to match those stores
+   * 
+   * All filters support multi-select. Empty array = "All".
+   */
+  const handleMultiSelectFilterChange = async (field: "state" | "city" | "store", selected: string[]) => {
+    console.log(`🟢 [Filters] handleFilterChange: ${field} = [${selected.join(", ")}]`);
+    
+    // Calculate the new filter state immediately (before async operations)
+    let newState: string[] = filters.state;
+    let newCity: string[] = filters.city;
+    let newStore: string[] = filters.store;
+    
+    // Update the changed field
+    if (field === "state") {
+      newState = selected;
+      // Reset dependent filters
+      newCity = [];
+      newStore = [];
+    } else if (field === "city") {
+      newCity = selected;
+      // Reset dependent filters
+      newStore = [];
+    } else if (field === "store") {
+      newStore = selected;
+    }
+    
+    // Step 1: Update the filter state immediately
+    setFilters({
+      ...filters,
+      state: newState,
+      city: newCity,
+      store: newStore,
+    });
+    
+    // Step 2: Handle store selection - auto-adjust states and cities
+    if (field === "store" && selected.length > 0) {
+      try {
+        console.log(`🟢 [Filters] Getting store info for stores: [${selected.join(", ")}]`);
+        // Get store info to determine matching states and cities
+        const storeInfo = await getStoresInfo(selected);
+        console.log(`✅ [Filters] Stores selected: auto-adjusting states to [${storeInfo.states.join(", ")}], cities to [${storeInfo.cities.join(", ")}]`);
+        
+        // Update filters with auto-adjusted states and cities
+        const adjustedState = storeInfo.states.length > 0 ? storeInfo.states : newState;
+        const adjustedCity = storeInfo.cities.length > 0 ? storeInfo.cities : newCity;
+        
+        setFilters({
+          ...filters,
+          state: adjustedState,
+          city: adjustedCity,
+          store: selected,
+        });
+        
+        // Load filter options with auto-adjusted values
+        const options = await getCampaignDashboardFilters(
+          adjustedState.length > 0 ? adjustedState : undefined,
+          adjustedCity.length > 0 ? adjustedCity : undefined,
+          selected.length > 0 ? selected : undefined
+        );
+        console.log(`✅ [Filters] Loaded options: ${options.states.length} states, ${options.cities.length} cities, ${options.stores.length} stores`);
+        setFilterOptions(options);
+        return;
+      } catch (err) {
+        console.error("❌ [Filters] Failed to get stores info:", err);
+        // Fall through to load options without auto-adjustment
+      }
+    }
+    
+    // Step 3: Load filter options based on current filter state
+    try {
+      console.log(`🟢 [Filters] Loading options with: state=[${newState.join(", ")}], city=[${newCity.join(", ")}], store=[${newStore.join(", ")}]`);
+      console.log(`🟢 [Filters] Making API call to getCampaignDashboardFilters...`);
       
-      // Reset dependent filters when parent changes
-      if (field === "state") {
-        // Reset city and store when state changes
-        updated.city = "All";
-        updated.store = "All";
+      const options = await getCampaignDashboardFilters(
+        newState.length > 0 ? newState : undefined,
+        newCity.length > 0 ? newCity : undefined,
+        newStore.length > 0 ? newStore : undefined
+      );
+      
+      console.log(`✅ [Filters] API call completed successfully`);
+      console.log(`✅ [Filters] Loaded options: ${options.states.length} states, ${options.cities.length} cities, ${options.stores.length} stores`);
+      console.log(`🟢 [Filters] Returned states from backend: [${options.states.join(", ")}]`);
+      console.log(`🟢 [Filters] Returned cities from backend: [${options.cities.join(", ")}]`);
+      console.log(`🟢 [Filters] Returned stores from backend: [${options.stores.slice(0, 5).join(", ")}...] (showing first 5)`);
+      
+      // Step 4: Handle city selection - auto-adjust states to match selected cities
+      if (field === "city" && selected.length > 0) {
+        // The backend returns states that match the selected cities
+        // Update the state filter to match
+        const statesToSet = options.states.length > 0 ? options.states : [];
+        console.log(`🟢 [Filters] City selected: checking if states need update. Current: [${newState.join(", ")}], New: [${statesToSet.join(", ")}]`);
         
-        // Reload cities and stores filtered by selected state
-        if (value !== "All") {
-          getCampaignDashboardFilters(value)
-            .then((options) => {
-              setFilterOptions((prevOptions) => ({
-                ...prevOptions,
-                cities: options.cities,
-                stores: options.stores,
-              }));
-            })
-            .catch((err) => {
-              console.error("Failed to load filtered options for state:", err);
-            });
+        const currentStatesSorted = [...newState].sort();
+        const newStatesSorted = [...statesToSet].sort();
+        if (JSON.stringify(currentStatesSorted) !== JSON.stringify(newStatesSorted)) {
+          console.log(`✅ [Filters] Cities selected: auto-adjusting states to [${statesToSet.join(", ")}]`);
+          // Update filters with auto-adjusted states - use the calculated values directly
+          setFilters({
+            state: statesToSet,
+            city: selected,
+            store: newStore,
+            segmentMap: filters.segmentMap,
+            rValueBucket: filters.rValueBucket,
+            fValueBucket: filters.fValueBucket,
+            mValueBucket: filters.mValueBucket,
+          });
+          console.log(`✅ [Filters] State filter updated successfully to: [${statesToSet.join(", ")}]`);
         } else {
-          // Reset to all options when state is "All"
-          getCampaignDashboardFilters()
-            .then((options) => {
-              setFilterOptions((prevOptions) => ({
-                ...prevOptions,
-                cities: options.cities,
-                stores: options.stores,
-              }));
-            })
-            .catch((err) => {
-              console.error("Failed to load all filter options:", err);
-            });
-        }
-      } else if (field === "city") {
-        // Reset store when city changes
-        updated.store = "All";
-        
-        // Reload stores filtered by selected state and city
-        if (value !== "All" && currentState !== "All") {
-          getCampaignDashboardFilters(currentState, value)
-            .then((options) => {
-              setFilterOptions((prevOptions) => ({
-                ...prevOptions,
-                stores: options.stores,
-              }));
-            })
-            .catch((err) => {
-              console.error("Failed to load filtered stores for city:", err);
-            });
-        } else if (value === "All" && currentState !== "All") {
-          // Load all stores for the state when city is reset to "All"
-          getCampaignDashboardFilters(currentState)
-            .then((options) => {
-              setFilterOptions((prevOptions) => ({
-                ...prevOptions,
-                stores: options.stores,
-              }));
-            })
-            .catch((err) => {
-              console.error("Failed to load stores for state:", err);
-            });
-        } else if (value === "All" && currentState === "All") {
-          // Load all stores when both state and city are "All"
-          getCampaignDashboardFilters()
-            .then((options) => {
-              setFilterOptions((prevOptions) => ({
-                ...prevOptions,
-                stores: options.stores,
-              }));
-            })
-            .catch((err) => {
-              console.error("Failed to load all stores:", err);
-            });
-        }
-      } else if (field === "store") {
-        // When store is selected, automatically set state and city
-        if (value !== "All") {
-          getStoreInfo(value)
-            .then((storeInfo) => {
-              if (storeInfo.state && storeInfo.city) {
-                const storeState = storeInfo.state;
-                const storeCity = storeInfo.city;
-                
-                // Update state and city automatically
-                setFilters((prevFilters) => ({
-                  ...prevFilters,
-                  state: storeState,
-                  city: storeCity,
-                  store: value,
-                }));
-                
-                // Reload filter options for the determined state and city
-                getCampaignDashboardFilters(storeState, storeCity)
-                  .then((options) => {
-                    setFilterOptions((prevOptions) => ({
-                      ...prevOptions,
-                      cities: options.cities,
-                      stores: options.stores,
-                    }));
-                  })
-                  .catch((err) => {
-                    console.error("Failed to load filter options for store:", err);
-                  });
-              } else {
-                console.warn(`Store info not found for: ${value}`);
-              }
-            })
-            .catch((err) => {
-              console.error("Failed to get store info:", err);
-            });
-        } else {
-          // When store is reset to "All", reload all options
-          getCampaignDashboardFilters()
-            .then((options) => {
-              setFilterOptions((prevOptions) => ({
-                ...prevOptions,
-                cities: options.cities,
-                stores: options.stores,
-              }));
-            })
-            .catch((err) => {
-              console.error("Failed to load all filter options:", err);
-            });
+          console.log(`🟢 [Filters] States already match selected cities, no update needed`);
         }
       }
       
-      return updated;
-    });
+      setFilterOptions(options);
+      console.log(`✅ [Filters] Filter options updated in UI`);
+    } catch (err: any) {
+      console.error(`❌ [Filters] Failed to load filter options for ${field}:`, err);
+      console.error(`❌ [Filters] Error message:`, err?.message || err);
+      console.error(`❌ [Filters] Error stack:`, err?.stack);
+      if (err?.response) {
+        console.error(`❌ [Filters] API Error response:`, err.response);
+        console.error(`❌ [Filters] API Error status:`, err.response?.status);
+        console.error(`❌ [Filters] API Error data:`, err.response?.data);
+      }
+    }
+  };
+
+  // Handler for single-select filters (segmentMap, rValueBucket, etc.)
+  const handleFilterChange = (field: "segmentMap" | "rValueBucket" | "fValueBucket" | "mValueBucket", value: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
   const loadDashboardData = useCallback(async (filterParams?: CampaignDashboardFilters, isFilterApplication: boolean = false) => {
@@ -332,17 +437,22 @@ export default function CampaignDashboard() {
     console.log("🔵 [Dashboard] Loading dashboard data with filters:", filterParams || "no filters (initial load)");
     
     // Log the actual API URL that will be called
-    const apiUrl = filterParams 
-      ? `/campaign/dashboard?${new URLSearchParams({
-          ...(filterParams.state && { state: filterParams.state }),
-          ...(filterParams.city && { city: filterParams.city }),
-          ...(filterParams.store && { store: filterParams.store }),
-          ...(filterParams.segment_map && { segment_map: filterParams.segment_map }),
-          ...(filterParams.r_value_bucket && { r_value_bucket: filterParams.r_value_bucket }),
-          ...(filterParams.f_value_bucket && { f_value_bucket: filterParams.f_value_bucket }),
-          ...(filterParams.m_value_bucket && { m_value_bucket: filterParams.m_value_bucket }),
-        }).toString()}`
-      : "/campaign/dashboard";
+    // Build URLSearchParams manually to handle arrays
+    const params = new URLSearchParams();
+    if (filterParams?.state && Array.isArray(filterParams.state)) {
+      filterParams.state.forEach(s => params.append("state", s));
+    }
+    if (filterParams?.city && Array.isArray(filterParams.city)) {
+      filterParams.city.forEach(c => params.append("city", c));
+    }
+    if (filterParams?.store && Array.isArray(filterParams.store)) {
+      filterParams.store.forEach(s => params.append("store", s));
+    }
+    if (filterParams?.segment_map) params.append("segment_map", filterParams.segment_map);
+    if (filterParams?.r_value_bucket) params.append("r_value_bucket", filterParams.r_value_bucket);
+    if (filterParams?.f_value_bucket) params.append("f_value_bucket", filterParams.f_value_bucket);
+    if (filterParams?.m_value_bucket) params.append("m_value_bucket", filterParams.m_value_bucket);
+    const apiUrl = filterParams ? `/campaign/dashboard?${params.toString()}` : "/campaign/dashboard";
     console.log("🔵 [Dashboard] API URL:", apiUrl);
 
     // Show a progress indicator for long-running requests
@@ -508,7 +618,7 @@ export default function CampaignDashboard() {
       // Load filter options from database table via API with timeout
       console.log("🟢 [Filters] Calling getCampaignDashboardFilters()...");
       const options = await Promise.race([
-        getCampaignDashboardFilters(),
+        getCampaignDashboardFilters(undefined, undefined, undefined),
         new Promise<FilterOptions>((_, reject) => 
           setTimeout(() => reject(new Error("Filter options request timed out")), 10000)
         )
@@ -732,72 +842,30 @@ export default function CampaignDashboard() {
         }}
       >
         <div className="filter-row">
-          <div className="filter-group filter-item select-field">
-            <label>State</label>
-            <select
-              className="filter-select"
-              value={filters.state}
-              onChange={(e) => handleFilterChange("state", e.target.value)}
-              disabled={filtersLoading}
-            >
-              <option>All</option>
-              {filtersLoading ? (
-                <option>Loading...</option>
-              ) : filterOptions.states && filterOptions.states.length > 0 ? (
-                filterOptions.states.map((state) => (
-                  <option key={state} value={state}>
-                    {state}
-                  </option>
-                ))
-              ) : (
-                <option disabled>No states available</option>
-              )}
-            </select>
-          </div>
-          <div className="filter-group filter-item select-field">
-            <label>City</label>
-            <select
-              className="filter-select"
-              value={filters.city}
-              onChange={(e) => handleFilterChange("city", e.target.value)}
-              disabled={filtersLoading}
-            >
-              <option>All</option>
-              {filtersLoading ? (
-                <option>Loading...</option>
-              ) : filterOptions.cities && filterOptions.cities.length > 0 ? (
-                filterOptions.cities.map((city) => (
-                  <option key={city} value={city}>
-                    {city}
-                  </option>
-                ))
-              ) : (
-                <option disabled>No cities available</option>
-              )}
-            </select>
-          </div>
-          <div className="filter-group filter-item select-field">
-            <label>Store</label>
-            <select
-              className="filter-select"
-              value={filters.store}
-              onChange={(e) => handleFilterChange("store", e.target.value)}
-              disabled={filtersLoading}
-            >
-              <option>All</option>
-              {filtersLoading ? (
-                <option>Loading...</option>
-              ) : filterOptions.stores && filterOptions.stores.length > 0 ? (
-                filterOptions.stores.map((store) => (
-                  <option key={store} value={store}>
-                    {store}
-                  </option>
-                ))
-              ) : (
-                <option disabled>No stores available</option>
-              )}
-            </select>
-          </div>
+          <MultiSelect
+            label="State"
+            options={filterOptions.states || []}
+            selected={filters.state}
+            onChange={(selected) => handleMultiSelectFilterChange("state", selected)}
+            disabled={filtersLoading}
+            placeholder="Select states..."
+          />
+          <MultiSelect
+            label="City"
+            options={filterOptions.cities || []}
+            selected={filters.city}
+            onChange={(selected) => handleMultiSelectFilterChange("city", selected)}
+            disabled={filtersLoading}
+            placeholder="Select cities..."
+          />
+          <MultiSelect
+            label="Store"
+            options={filterOptions.stores || []}
+            selected={filters.store}
+            onChange={(selected) => handleMultiSelectFilterChange("store", selected)}
+            disabled={filtersLoading}
+            placeholder="Select stores..."
+          />
           <div className="filter-group filter-item select-field">
             <label>Segment Map</label>
             <select

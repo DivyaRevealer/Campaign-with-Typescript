@@ -247,9 +247,9 @@ export interface FiscalYearData {
 }
 
 export interface CampaignDashboardFilters {
-  state?: string;
-  city?: string;
-  store?: string;
+  state?: string[];  // Multi-select support
+  city?: string[];  // Multi-select support
+  store?: string[];  // Multi-select support
   segment_map?: string;
   r_value_bucket?: string;
   f_value_bucket?: string;
@@ -300,11 +300,35 @@ export const getCampaignDashboard = (
   return http.get<CampaignDashboardOut>(url, { timeout: 180000, signal }).then((r) => r.data);
 };
 
-export const getCampaignDashboardFilters = (state?: string, city?: string): Promise<FilterOptions> => {
+export const getCampaignDashboardFilters = (
+  state?: string[],
+  city?: string[],
+  store?: string[]
+): Promise<FilterOptions> => {
   // Add timeout of 10 seconds for filter options (should be fast)
+  // Supports multi-select: append each value separately
   const params = new URLSearchParams();
-  if (state && state !== "All") params.append("state", state);
-  if (city && city !== "All") params.append("city", city);
+  if (state && Array.isArray(state)) {
+    state.forEach(s => {
+      if (s && s !== "All") params.append("state", s);
+    });
+  } else if (state && state !== "All") {
+    params.append("state", state);
+  }
+  if (city && Array.isArray(city)) {
+    city.forEach(c => {
+      if (c && c !== "All") params.append("city", c);
+    });
+  } else if (city && city !== "All") {
+    params.append("city", city);
+  }
+  if (store && Array.isArray(store)) {
+    store.forEach(s => {
+      if (s && s !== "All") params.append("store", s);
+    });
+  } else if (store && store !== "All") {
+    params.append("store", store);
+  }
   const queryString = params.toString();
   const url = `/campaign/dashboard/filters${queryString ? `?${queryString}` : ""}`;
   return http.get<FilterOptions>(url, { timeout: 10000 }).then((r) => r.data);
@@ -312,4 +336,12 @@ export const getCampaignDashboardFilters = (state?: string, city?: string): Prom
 
 export const getStoreInfo = (store: string): Promise<{ state: string | null; city: string | null }> => {
   return http.get<{ state: string | null; city: string | null }>(`/campaign/dashboard/filters/store-info?store=${encodeURIComponent(store)}`, { timeout: 10000 }).then((r) => r.data);
+};
+
+export const getStoresInfo = (stores: string[]): Promise<{ states: string[]; cities: string[] }> => {
+  const params = new URLSearchParams();
+  stores.forEach(s => {
+    if (s && s !== "All") params.append("stores", s);
+  });
+  return http.get<{ states: string[]; cities: string[] }>(`/campaign/dashboard/filters/stores-info?${params.toString()}`, { timeout: 10000 }).then((r) => r.data);
 };

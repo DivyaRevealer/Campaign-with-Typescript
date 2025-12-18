@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import json
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 from asyncio import TimeoutError as AsyncTimeoutError
 
 from fastapi import APIRouter, Depends, Query, Request, HTTPException
@@ -38,22 +38,52 @@ STALE_CACHE_TTL = 7200  # Serve stale cache for up to 2 hours while refreshing
 
 
 def _apply_base_filters(query, filters: dict):
-    """Apply common filters to a query. Optimized with indexed columns."""
+    """
+    Apply common filters to a query. Optimized with indexed columns.
+    Supports multi-select filters using IN clauses for state, city, store.
+    """
     
-    # State filter
+    # State filter - supports multi-select (list) or single value
     state = filters.get("state")
-    if state and state != "All" and state.strip():
-        query = query.where(InvCrmAnalysisTcm.last_in_store_state == state)
+    if state:
+        if isinstance(state, list):
+            # Multi-select: use IN clause for multiple states
+            if state and len(state) > 0:
+                # Filter out "All" and empty strings
+                valid_states = [s for s in state if s and s != "All" and str(s).strip()]
+                if valid_states:
+                    query = query.where(InvCrmAnalysisTcm.last_in_store_state.in_(valid_states))
+        elif state != "All" and str(state).strip():
+            # Single value
+            query = query.where(InvCrmAnalysisTcm.last_in_store_state == state)
     
-    # City filter
+    # City filter - supports multi-select (list) or single value
     city = filters.get("city")
-    if city and city != "All" and city.strip():
-        query = query.where(InvCrmAnalysisTcm.last_in_store_city == city)
+    if city:
+        if isinstance(city, list):
+            # Multi-select: use IN clause for multiple cities
+            if city and len(city) > 0:
+                # Filter out "All" and empty strings
+                valid_cities = [c for c in city if c and c != "All" and str(c).strip()]
+                if valid_cities:
+                    query = query.where(InvCrmAnalysisTcm.last_in_store_city.in_(valid_cities))
+        elif city != "All" and str(city).strip():
+            # Single value
+            query = query.where(InvCrmAnalysisTcm.last_in_store_city == city)
     
-    # Store filter (using store name)
+    # Store filter - supports multi-select (list) or single value
     store = filters.get("store")
-    if store and store != "All" and store.strip():
-        query = query.where(InvCrmAnalysisTcm.last_in_store_name == store)
+    if store:
+        if isinstance(store, list):
+            # Multi-select: use IN clause for multiple stores
+            if store and len(store) > 0:
+                # Filter out "All" and empty strings
+                valid_stores = [s for s in store if s and s != "All" and str(s).strip()]
+                if valid_stores:
+                    query = query.where(InvCrmAnalysisTcm.last_in_store_name.in_(valid_stores))
+        elif store != "All" and str(store).strip():
+            # Single value
+            query = query.where(InvCrmAnalysisTcm.last_in_store_name == store)
     
     # Segment Map filter
     segment_map = filters.get("segment_map")
@@ -670,9 +700,9 @@ async def _refresh_cache_background(
 @router.get("/dashboard", response_model=CampaignDashboardOut)
 async def get_campaign_dashboard_optimized(
     request: Request,
-    state: Optional[str] = Query(None, description="Filter by state"),
-    city: Optional[str] = Query(None, description="Filter by city"),
-    store: Optional[str] = Query(None, description="Filter by store name"),
+    state: Optional[List[str]] = Query(None, description="Filter by state(s) - supports multi-select"),
+    city: Optional[List[str]] = Query(None, description="Filter by city(ies) - supports multi-select"),
+    store: Optional[List[str]] = Query(None, description="Filter by store name(s) - supports multi-select"),
     segment_map: Optional[str] = Query(None, description="Filter by segment map"),
     r_value_bucket: Optional[str] = Query(None, description="Filter by R value bucket"),
     f_value_bucket: Optional[str] = Query(None, description="Filter by F value bucket"),
@@ -692,15 +722,16 @@ async def get_campaign_dashboard_optimized(
     - SQL aggregation instead of Python processing
     """
     
-    # Normalize filters
+    # Normalize filters - handle both list and single values
+    # FastAPI automatically converts query params like ?state=A&state=B into a list
     filters = {
-        "state": state if state and state != "All" and state.strip() else None,
-        "city": city if city and city != "All" and city.strip() else None,
-        "store": store if store and store != "All" and store.strip() else None,
-        "segment_map": segment_map if segment_map and segment_map != "All" and segment_map.strip() else None,
-        "r_value_bucket": r_value_bucket if r_value_bucket and r_value_bucket != "All" and r_value_bucket.strip() else None,
-        "f_value_bucket": f_value_bucket if f_value_bucket and f_value_bucket != "All" and f_value_bucket.strip() else None,
-        "m_value_bucket": m_value_bucket if m_value_bucket and m_value_bucket != "All" and m_value_bucket.strip() else None,
+        "state": state if state else None,  # Already a list or None from FastAPI
+        "city": city if city else None,  # Already a list or None from FastAPI
+        "store": store if store else None,  # Already a list or None from FastAPI
+        "segment_map": segment_map if segment_map and segment_map != "All" and str(segment_map).strip() else None,
+        "r_value_bucket": r_value_bucket if r_value_bucket and r_value_bucket != "All" and str(r_value_bucket).strip() else None,
+        "f_value_bucket": f_value_bucket if f_value_bucket and f_value_bucket != "All" and str(f_value_bucket).strip() else None,
+        "m_value_bucket": m_value_bucket if m_value_bucket and m_value_bucket != "All" and str(m_value_bucket).strip() else None,
     }
     
     # Generate cache key from filters
@@ -869,7 +900,7 @@ async def get_store_info(
     session: AsyncSession = Depends(get_session),
     user: InvUserMaster = Depends(get_current_user),
 ):
-    """Get state and city for a specific store name."""
+    """Get state and city for a specific store name. Returns first matching state/city."""
     try:
         query = select(
             InvCrmAnalysisTcm.last_in_store_state,
@@ -899,76 +930,174 @@ async def get_store_info(
         )
 
 
+@router.get("/dashboard/filters/stores-info")
+async def get_stores_info(
+    stores: List[str] = Query(..., description="Store names to get states and cities for (multi-select)"),
+    session: AsyncSession = Depends(get_session),
+    user: InvUserMaster = Depends(get_current_user),
+):
+    """Get all unique states and cities for multiple store names. Used for multi-select cascading."""
+    try:
+        # Filter out "All" and empty values
+        valid_stores = [s for s in stores if s and s != "All" and str(s).strip()]
+        if not valid_stores:
+            return {"states": [], "cities": []}
+        
+        query = select(
+            InvCrmAnalysisTcm.last_in_store_state,
+            InvCrmAnalysisTcm.last_in_store_city
+        ).distinct().where(
+            and_(
+                InvCrmAnalysisTcm.last_in_store_name.in_(valid_stores),
+                InvCrmAnalysisTcm.last_in_store_state.isnot(None),
+                InvCrmAnalysisTcm.last_in_store_city.isnot(None),
+            )
+        )
+        
+        result = await session.execute(query)
+        rows = result.all()
+        
+        states = sorted(set([str(row.last_in_store_state).strip() for row in rows if row.last_in_store_state]))
+        cities = sorted(set([str(row.last_in_store_city).strip() for row in rows if row.last_in_store_city]))
+        
+        return {"states": states, "cities": cities}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting stores info: {str(e)}"
+        )
+
+
 @router.get("/dashboard/filters", response_model=FilterOptions)
 async def get_campaign_dashboard_filters_optimized(
-    state: Optional[str] = Query(None, description="Filter cities and stores by state"),
-    city: Optional[str] = Query(None, description="Filter stores by city"),
+    state: Optional[List[str]] = Query(None, description="Filter cities and stores by state(s) - supports multi-select"),
+    city: Optional[List[str]] = Query(None, description="Filter stores by city(ies) - supports multi-select"),
+    store: Optional[List[str]] = Query(None, description="Filter states and cities by store(s) - supports multi-select"),
     session: AsyncSession = Depends(get_session),
     user: InvUserMaster = Depends(get_current_user),
 ) -> FilterOptions:
     """
-    OPTIMIZED: Get filter options with caching and dependent filtering.
-    Filter options change infrequently, so caching is very effective here.
+    OPTIMIZED: Get filter options with caching and cascading multi-select filtering.
     
-    Dependent filters:
-    - Cities are filtered by state (if state provided)
-    - Stores are filtered by state and city (if provided)
+    Cascading Logic:
+    1. If states selected → filter cities and stores by those states
+    2. If cities selected → filter stores by those cities, and auto-adjust states to match
+    3. If stores selected → auto-adjust states and cities to match those stores
+    
+    All filters support multi-select. When multiple values are selected, options are merged.
     """
     
-    # Generate cache key including state/city for dependent filters
-    cache_key = f"campaign_dashboard_filters_v3_{state or 'all'}_{city or 'all'}"
+    # Normalize inputs - filter out "All" and empty values
+    selected_states = [s for s in (state or []) if s and s != "All" and str(s).strip()] if state else []
+    selected_cities = [c for c in (city or []) if c and c != "All" and str(c).strip()] if city else []
+    selected_stores = [s for s in (store or []) if s and s != "All" and str(s).strip()] if store else []
+    
+    # Generate cache key including all filter selections
+    cache_key = f"campaign_dashboard_filters_v4_{','.join(sorted(selected_states)) or 'all'}_{','.join(sorted(selected_cities)) or 'all'}_{','.join(sorted(selected_stores)) or 'all'}"
     
     # Try cache first
     cached_result = await get_cache(cache_key)
     if cached_result:
         print(f"🟢 [Filters] Returning cached result for key: {cache_key}")
-        print(f"🟢 [Filters] Cached states count: {len(cached_result.get('states', []))}")
         return FilterOptions(**cached_result)
     else:
-        print(f"🟢 [Filters] No cache found for key: {cache_key}, querying database...")
+        print(f"🟢 [Filters] No cache found, querying database...")
     
     try:
-        print(f"🟢 [Filters] Loading filter options (state={state}, city={city})")
+        print(f"🟢 [Filters] Loading filter options (states={selected_states}, cities={selected_cities}, stores={selected_stores})")
         
-        # Get distinct states (always return all states)
-        states_query = select(InvCrmAnalysisTcm.last_in_store_state).distinct().where(
-            and_(
-                InvCrmAnalysisTcm.last_in_store_state.isnot(None),
-                InvCrmAnalysisTcm.last_in_store_state != "",
+        # CASCADING LOGIC IMPLEMENTATION:
+        # 1. If stores are selected, get matching states and cities first (reverse dependency)
+        if selected_stores:
+            # Get states and cities that match the selected stores
+            store_info_query = select(
+                InvCrmAnalysisTcm.last_in_store_state,
+                InvCrmAnalysisTcm.last_in_store_city
+            ).distinct().where(
+                and_(
+                    InvCrmAnalysisTcm.last_in_store_name.in_(selected_stores),
+                    InvCrmAnalysisTcm.last_in_store_state.isnot(None),
+                    InvCrmAnalysisTcm.last_in_store_city.isnot(None),
+                )
             )
-        ).order_by(InvCrmAnalysisTcm.last_in_store_state)
+            store_info_results = await session.execute(store_info_query)
+            store_info_rows = store_info_results.all()
+            matching_states = sorted(set([str(row.last_in_store_state).strip() for row in store_info_rows if row.last_in_store_state]))
+            matching_cities = sorted(set([str(row.last_in_store_city).strip() for row in store_info_rows if row.last_in_store_city]))
+            print(f"🟢 [Filters] Stores selected: found {len(matching_states)} matching states, {len(matching_cities)} matching cities")
+            
+            # Use matching states/cities for filtering, or merge with user selections
+            effective_states = list(set(matching_states + selected_states)) if selected_states else matching_states
+            effective_cities = list(set(matching_cities + selected_cities)) if selected_cities else matching_cities
+        else:
+            effective_states = selected_states
+            effective_cities = selected_cities
+        
+        # 2. Get distinct states
+        # CASCADING: If cities are selected, always show states that match those cities (even if states were also selected)
+        # This ensures states auto-adjust when cities are selected
+        if effective_cities:
+            # Cities selected: show only states that have those cities
+            states_query = select(InvCrmAnalysisTcm.last_in_store_state).distinct().where(
+                and_(
+                    InvCrmAnalysisTcm.last_in_store_city.in_(effective_cities),
+                    InvCrmAnalysisTcm.last_in_store_state.isnot(None),
+                    InvCrmAnalysisTcm.last_in_store_state != "",
+                )
+            )
+            # If states were also selected, intersect with those (only show states that match both)
+            if effective_states:
+                states_query = states_query.where(InvCrmAnalysisTcm.last_in_store_state.in_(effective_states))
+            states_query = states_query.order_by(InvCrmAnalysisTcm.last_in_store_state)
+        else:
+            # No cities selected: get all states, or filter by selected states
+            states_query = select(InvCrmAnalysisTcm.last_in_store_state).distinct().where(
+                and_(
+                    InvCrmAnalysisTcm.last_in_store_state.isnot(None),
+                    InvCrmAnalysisTcm.last_in_store_state != "",
+                )
+            )
+            if effective_states:
+                states_query = states_query.where(InvCrmAnalysisTcm.last_in_store_state.in_(effective_states))
+            states_query = states_query.order_by(InvCrmAnalysisTcm.last_in_store_state)
+        
         states_results = await session.execute(states_query)
         states = sorted([str(row.last_in_store_state).strip() for row in states_results.all() if row.last_in_store_state])
         print(f"🟢 [Filters] Found {len(states)} states")
         
-        # Get distinct cities (filtered by state if provided)
+        # 3. Get distinct cities
+        # Filter by effective states if any
         cities_query = select(InvCrmAnalysisTcm.last_in_store_city).distinct().where(
             and_(
                 InvCrmAnalysisTcm.last_in_store_city.isnot(None),
                 InvCrmAnalysisTcm.last_in_store_city != "",
             )
         )
-        if state and state != "All" and state.strip():
-            cities_query = cities_query.where(InvCrmAnalysisTcm.last_in_store_state == state)
-            print(f"🟢 [Filters] Filtering cities by state: {state}")
+        if effective_states:
+            cities_query = cities_query.where(InvCrmAnalysisTcm.last_in_store_state.in_(effective_states))
+        if effective_cities:
+            # If cities are selected, only show those cities
+            cities_query = cities_query.where(InvCrmAnalysisTcm.last_in_store_city.in_(effective_cities))
         cities_query = cities_query.order_by(InvCrmAnalysisTcm.last_in_store_city)
         cities_results = await session.execute(cities_query)
         cities = sorted([str(row.last_in_store_city).strip() for row in cities_results.all() if row.last_in_store_city])
         print(f"🟢 [Filters] Found {len(cities)} cities")
         
-        # Get distinct store names (filtered by state and city if provided)
+        # 4. Get distinct store names
+        # Filter by effective states and cities
         stores_query = select(InvCrmAnalysisTcm.last_in_store_name).distinct().where(
             and_(
                 InvCrmAnalysisTcm.last_in_store_name.isnot(None),
                 InvCrmAnalysisTcm.last_in_store_name != "",
             )
         )
-        if state and state != "All" and state.strip():
-            stores_query = stores_query.where(InvCrmAnalysisTcm.last_in_store_state == state)
-            print(f"🟢 [Filters] Filtering stores by state: {state}")
-        if city and city != "All" and city.strip():
-            stores_query = stores_query.where(InvCrmAnalysisTcm.last_in_store_city == city)
-            print(f"🟢 [Filters] Filtering stores by city: {city}")
+        if effective_states:
+            stores_query = stores_query.where(InvCrmAnalysisTcm.last_in_store_state.in_(effective_states))
+        if effective_cities:
+            stores_query = stores_query.where(InvCrmAnalysisTcm.last_in_store_city.in_(effective_cities))
+        if selected_stores:
+            # If stores are selected, only show those stores
+            stores_query = stores_query.where(InvCrmAnalysisTcm.last_in_store_name.in_(selected_stores))
         stores_query = stores_query.order_by(InvCrmAnalysisTcm.last_in_store_name).limit(1000)  # Limit for performance
         stores_results = await session.execute(stores_query)
         stores = sorted([str(row.last_in_store_name).strip() for row in stores_results.all() if row.last_in_store_name])

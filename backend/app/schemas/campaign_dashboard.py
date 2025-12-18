@@ -46,11 +46,11 @@ class FiscalYearData(BaseModel):
 
 
 class CampaignDashboardFilters(BaseModel):
-    """Filters for campaign dashboard query."""
+    """Filters for campaign dashboard query. Supports multi-select for state, city, store."""
 
-    state: Optional[str] = Field(default=None, description="Filter by state")
-    city: Optional[str] = Field(default=None, description="Filter by city")
-    store: Optional[str] = Field(default=None, description="Filter by store name")
+    state: Optional[list[str]] = Field(default=None, description="Filter by state(s) - supports multi-select")
+    city: Optional[list[str]] = Field(default=None, description="Filter by city(ies) - supports multi-select")
+    store: Optional[list[str]] = Field(default=None, description="Filter by store name(s) - supports multi-select")
     segment_map: Optional[str] = Field(default=None, description="Filter by segment map")
     r_value_bucket: Optional[str] = Field(default=None, description="Filter by R value bucket")
     f_value_bucket: Optional[str] = Field(default=None, description="Filter by F value bucket")

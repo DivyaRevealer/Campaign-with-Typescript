@@ -153,6 +153,32 @@
   height: 16px;
 }
 
+.multi-select-arrow {
+  color: var(--admin-muted-text, #666);
+  font-size: 10px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.multi-select-clear {
+  color: var(--admin-muted-text, #666);
+  font-size: 18px;
+  margin-left: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.multi-select-clear:hover {
+  color: var(--admin-text, #1a1a1a);
+}
+
+.multi-select.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .multi-select-option span {
   flex: 1;
   font-size: 13px;
