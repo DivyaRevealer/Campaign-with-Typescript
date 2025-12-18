@@ -349,6 +349,49 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
       });
   }, [id]);
 
+  // Auto-populate city and state when branch is selected
+  useEffect(() => {
+    if (!options || !watchBranch || watchBranch.length === 0) {
+      return;
+    }
+
+    const { branch_city_map, branch_state_map } = options;
+
+    // Extract unique cities and states from selected branches
+    const citiesSet = new Set<string>();
+    const statesSet = new Set<string>();
+
+    watchBranch.forEach((branch) => {
+      const cities = branch_city_map?.[branch] || [];
+      const states = branch_state_map?.[branch] || [];
+      cities.forEach((city) => citiesSet.add(city));
+      states.forEach((state) => statesSet.add(state));
+    });
+
+    const uniqueCities = Array.from(citiesSet).sort();
+    const uniqueStates = Array.from(statesSet).sort();
+
+    // Only update if there are cities/states to set and they differ from current values
+    const currentCities = form.city || [];
+    const currentStates = form.state || [];
+
+    const citiesChanged = 
+      uniqueCities.length !== currentCities.length ||
+      !uniqueCities.every((city) => currentCities.includes(city));
+    
+    const statesChanged = 
+      uniqueStates.length !== currentStates.length ||
+      !uniqueStates.every((state) => currentStates.includes(state));
+
+    if (citiesChanged || statesChanged) {
+      setForm((prev) => ({
+        ...prev,
+        city: uniqueCities.length > 0 ? uniqueCities : undefined,
+        state: uniqueStates.length > 0 ? uniqueStates : undefined,
+      }));
+    }
+  }, [watchBranch, options]);
+
   // Compute geography options (matching reference logic)
   const computeGeoOptions = () => {
     if (!options) {
@@ -613,9 +656,11 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
             <div className="multi-select-display">
               {selected.length === 0
                 ? placeholder
-                : isAllSelected
-                  ? `All (${selected.length})`
-                  : `${selected.length} selected`}
+                : selected.length === 1
+                  ? selected[0]
+                  : isAllSelected
+                    ? `All (${selected.length})`
+                    : `${selected.length} selected`}
             </div>
             {selected.length > 0 && (
               <span className="multi-select-clear" onClick={handleClearAll}>
@@ -629,8 +674,8 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
               ref={dropdownRef}
               onMouseDown={(e) => {
                 // Prevent mousedown from bubbling - this is critical to keep dropdown open
+                // Don't prevent default to allow scrolling to work
                 e.stopPropagation();
-                e.preventDefault();
               }}
               onClick={(e) => {
                 // Prevent clicks inside dropdown from closing it
@@ -646,6 +691,9 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                 left: `${dropdownPosition.left}px`,
                 width: `${dropdownPosition.width}px`,
                 zIndex: 1000,
+                maxHeight: '256px',
+                overflowY: 'auto',
+                overflowX: 'hidden',
               }}
             >
               <div
@@ -815,9 +863,11 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
             <div className="multi-select-display">
               {selected.length === 0
                 ? placeholder
-                : isAllSelected
-                  ? `All (${selected.length})`
-                  : `${selected.length} selected`}
+                : selected.length === 1
+                  ? String(selected[0])
+                  : isAllSelected
+                    ? `All (${selected.length})`
+                    : `${selected.length} selected`}
             </div>
             {selected.length > 0 && (
               <span className="multi-select-clear" onClick={handleClearAll}>
@@ -828,10 +878,24 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
               <div 
                 className="multi-select-dropdown"
                 ref={dropdownRef}
+                onMouseDown={(e) => {
+                  // Prevent mousedown from bubbling but allow scrolling
+                  // Don't prevent default to allow scrolling to work
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  // Prevent clicks inside dropdown from closing it
+                  e.stopPropagation();
+                }}
                 style={{
+                  position: 'fixed',
                   top: `${dropdownPosition?.top ?? 0}px`,
                   left: `${dropdownPosition?.left ?? 0}px`,
                   width: `${dropdownPosition?.width ?? 0}px`,
+                  zIndex: 1000,
+                  maxHeight: '256px',
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
                 }}
               >
                 <div className="multi-select-option" onClick={(e) => { e.stopPropagation(); handleSelectAll(); }}>
