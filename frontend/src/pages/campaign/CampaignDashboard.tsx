@@ -197,6 +197,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const isScrollingDropdownRef = useRef(false);
 
   // Close dropdown when clicking outside or scrolling
   useEffect(() => {
@@ -208,8 +209,20 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
       }
     };
 
-    const handleScroll = () => {
-      // Close dropdown when user scrolls
+    const handleScroll = (e: Event) => {
+      // If we're currently scrolling inside the dropdown, don't close
+      if (isScrollingDropdownRef.current) {
+        return;
+      }
+      
+      // Check if scroll target is inside the dropdown
+      const target = e.target as Node;
+      if (dropdownRef.current && dropdownRef.current.contains(target)) {
+        // Scroll is inside dropdown, don't close
+        return;
+      }
+      
+      // Scroll is outside dropdown (page scroll), close it
       setIsOpen(false);
     };
 
@@ -257,7 +270,19 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
           )}
         </div>
         {isOpen && !disabled && (
-          <div className="multi-select-dropdown">
+          <div 
+            className="multi-select-dropdown"
+            onScroll={(e) => {
+              // Mark that we're scrolling inside the dropdown
+              isScrollingDropdownRef.current = true;
+              // Stop scroll event from bubbling to window
+              e.stopPropagation();
+              // Reset flag after a short delay
+              setTimeout(() => {
+                isScrollingDropdownRef.current = false;
+              }, 100);
+            }}
+          >
             {options.length === 0 ? (
               <div className="multi-select-option disabled">No options available</div>
             ) : (

@@ -566,6 +566,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
     const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const isScrollingDropdownRef = useRef(false);
 
     useEffect(() => {
       if (!isOpen) return; // Only attach listeners when dropdown is open
@@ -584,15 +585,29 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
         }
       };
 
-      const handleScroll = () => {
-        // Close dropdown when user scrolls
+      const handleScroll = (e: Event) => {
+        // If we're currently scrolling inside the dropdown, don't close
+        if (isScrollingDropdownRef.current) {
+          return;
+        }
+        
+        // Check if scroll target is inside the dropdown
+        const target = e.target as Node;
+        if (dropdownRef.current && dropdownRef.current.contains(target)) {
+          // Scroll is inside dropdown, don't close
+          return;
+        }
+        
+        // Scroll is outside dropdown (page scroll), close it
         setIsOpen(false);
         setDropdownPosition(null);
       };
-      
+
       // Use mousedown with capture to catch events early, but only close on actual outside clicks
       document.addEventListener("mousedown", handleClickOutside, true);
-      window.addEventListener("scroll", handleScroll, true); // Use capture phase to catch all scrolls
+      // Listen to scroll events on window - will close dropdown on page scroll but not on dropdown scroll
+      window.addEventListener("scroll", handleScroll, true);
+      
       return () => {
         document.removeEventListener("mousedown", handleClickOutside, true);
         window.removeEventListener("scroll", handleScroll, true);
@@ -685,6 +700,16 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                 // Also prevent mouseup from bubbling
                 e.stopPropagation();
               }}
+              onScroll={(e) => {
+                // Mark that we're scrolling inside the dropdown
+                isScrollingDropdownRef.current = true;
+                // Stop scroll event from bubbling to window
+                e.stopPropagation();
+                // Reset flag after a short delay
+                setTimeout(() => {
+                  isScrollingDropdownRef.current = false;
+                }, 100);
+              }}
               style={{
                 position: 'fixed',
                 top: `${dropdownPosition.top}px`,
@@ -763,6 +788,7 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
     const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const isScrollingDropdownRef = useRef(false);
 
     useEffect(() => {
       if (!isOpen) return; // Only attach listeners when dropdown is open
@@ -781,14 +807,29 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
         }
       };
 
-      const handleScroll = () => {
-        // Close dropdown when user scrolls
+      const handleScroll = (e: Event) => {
+        // If we're currently scrolling inside the dropdown, don't close
+        if (isScrollingDropdownRef.current) {
+          return;
+        }
+        
+        // Check if scroll target is inside the dropdown
+        const target = e.target as Node;
+        if (dropdownRef.current && dropdownRef.current.contains(target)) {
+          // Scroll is inside dropdown, don't close
+          return;
+        }
+        
+        // Scroll is outside dropdown (page scroll), close it
         setIsOpen(false);
         setDropdownPosition(null);
       };
-      
+
+      // Use mousedown with capture to catch events early, but only close on actual outside clicks
       document.addEventListener("mousedown", handleClickOutside, true);
-      window.addEventListener("scroll", handleScroll, true); // Use capture phase to catch all scrolls
+      // Listen to scroll events on window - will close dropdown on page scroll but not on dropdown scroll
+      window.addEventListener("scroll", handleScroll, true);
+      
       return () => {
         document.removeEventListener("mousedown", handleClickOutside, true);
         window.removeEventListener("scroll", handleScroll, true);
@@ -886,6 +927,16 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                 onClick={(e) => {
                   // Prevent clicks inside dropdown from closing it
                   e.stopPropagation();
+                }}
+                onScroll={(e) => {
+                  // Mark that we're scrolling inside the dropdown
+                  isScrollingDropdownRef.current = true;
+                  // Stop scroll event from bubbling to window
+                  e.stopPropagation();
+                  // Reset flag after a short delay
+                  setTimeout(() => {
+                    isScrollingDropdownRef.current = false;
+                  }, 100);
                 }}
                 style={{
                   position: 'fixed',

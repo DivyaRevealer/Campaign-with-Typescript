@@ -145,8 +145,12 @@
   z-index: 10000;
   max-height: 256px;
   overflow-y: auto;
+  overflow-x: hidden;
   margin-top: 4px;
   min-width: 170px;
+  /* Ensure scrolling works */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .multi-select-option {
