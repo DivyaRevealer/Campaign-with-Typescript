@@ -19,6 +19,7 @@ from app.core.db_errors import raise_on_lock_conflict
 from app.core.deps import get_current_user
 from app.models.inv_create_campaign import InvCreateCampaign
 from app.models.inv_crm_analysis import InvCrmAnalysis
+from app.models.crm_store_dependency import CrmStoreDependency
 from app.models.inv_campaign_brand_filter import InvCampaignBrandFilter
 from app.models.inv_campaign_upload import InvCampaignUpload
 from app.models.inv_user import InvUserMaster
@@ -126,21 +127,21 @@ async def get_campaign_options(
             # Table might not exist, continue with empty list
             pass
 
-        # Geography - Branches, Cities, States from CRM analysis (matching reference implementation)
+        # Geography - Branches, Cities, States from crm_store_dependency table
         branches: list[str] = []
         branch_city_map: dict[str, list[str]] = {}
         branch_state_map: dict[str, list[str]] = {}
 
         try:
-            # Query all distinct geography rows (matching reference)
+            # Query all distinct geography rows from crm_store_dependency
             geo_query = select(
-                InvCrmAnalysis.last_in_store_name,
-                InvCrmAnalysis.last_in_store_city,
-                InvCrmAnalysis.last_in_store_state,
+                CrmStoreDependency.store_name,
+                CrmStoreDependency.city,
+                CrmStoreDependency.state,
             ).distinct()
             geo_results = (await session.execute(geo_query)).all()
 
-            # Build branches list (filter out None values)
+            # Build branches list (store_name maps to branch)
             branches = sorted({str(row[0]) for row in geo_results if row[0]})
 
             # Build branch-city map (matching reference: sorted sets)
