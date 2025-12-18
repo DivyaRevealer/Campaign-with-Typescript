@@ -266,6 +266,7 @@ export interface FilterOptions {
   m_value_buckets: string[];
 }
 
+
 export interface CampaignDashboardOut {
   kpi: CampaignKPIData;
   r_score_data: ChartDataPoint[];
@@ -332,7 +333,8 @@ export const getCampaignDashboardFilters = (
   const queryString = params.toString();
   const url = `/campaign/dashboard/filters${queryString ? `?${queryString}` : ""}`;
   console.log(`🟢 [API] Calling: ${url}`);
-  return http.get<FilterOptions>(url, { timeout: 30000 }).then((r) => {
+  // Increased timeout to 60 seconds for initial filter load (DISTINCT queries on large tables can be slow)
+  return http.get<FilterOptions>(url, { timeout: 60000 }).then((r) => {
     console.log(`✅ [API] Response received for: ${url}`);
     return r.data;
   });

@@ -36,7 +36,6 @@ router = APIRouter(prefix="/campaign", tags=["campaign-dashboard"])
 CACHE_TTL = 3600
 STALE_CACHE_TTL = 7200  # Serve stale cache for up to 2 hours while refreshing
 
-
 def _apply_base_filters(query, filters: dict):
     """
     Apply common filters to a query. Optimized with indexed columns.

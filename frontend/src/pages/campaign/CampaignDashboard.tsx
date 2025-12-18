@@ -358,13 +358,6 @@ export default function CampaignDashboard() {
       console.log(`🟢 [Filters] Loading options with: state=[${newState.join(", ")}], city=[${newCity.join(", ")}], store=[${newStore.join(", ")}]`);
       console.log(`🟢 [Filters] Making API call to getCampaignDashboardFilters...`);
       
-      // Build URL for logging
-      const params = new URLSearchParams();
-      if (newCity.length > 0) {
-        newCity.forEach(c => params.append("city", c));
-      }
-      console.log(`🟢 [Filters] API URL: /campaign/dashboard/filters?${params.toString()}`);
-      
       // Call API with increased timeout (30 seconds)
       const options = await getCampaignDashboardFilters(
         newState.length > 0 ? newState : undefined,
@@ -374,9 +367,6 @@ export default function CampaignDashboard() {
       
       console.log(`✅ [Filters] API call completed successfully`);
       console.log(`✅ [Filters] Loaded options: ${options.states.length} states, ${options.cities.length} cities, ${options.stores.length} stores`);
-      console.log(`🟢 [Filters] Returned states from backend: [${options.states.join(", ")}]`);
-      console.log(`🟢 [Filters] Returned cities from backend: [${options.cities.join(", ")}]`);
-      console.log(`🟢 [Filters] Returned stores from backend: [${options.stores.slice(0, 5).join(", ")}...] (showing first 5)`);
       
       // Step 4: Handle city selection - auto-adjust states to match selected cities
       if (field === "city" && selected.length > 0) {
@@ -389,7 +379,7 @@ export default function CampaignDashboard() {
         const newStatesSorted = [...statesToSet].sort();
         if (JSON.stringify(currentStatesSorted) !== JSON.stringify(newStatesSorted)) {
           console.log(`✅ [Filters] Cities selected: auto-adjusting states to [${statesToSet.join(", ")}]`);
-          // Update filters with auto-adjusted states - use the calculated values directly
+          // Update filters with auto-adjusted states
           setFilters({
             state: statesToSet,
             city: selected,
@@ -410,7 +400,6 @@ export default function CampaignDashboard() {
     } catch (err: any) {
       console.error(`❌ [Filters] Failed to load filter options for ${field}:`, err);
       console.error(`❌ [Filters] Error message:`, err?.message || err);
-      console.error(`❌ [Filters] Error stack:`, err?.stack);
       if (err?.response) {
         console.error(`❌ [Filters] API Error response:`, err.response);
         console.error(`❌ [Filters] API Error status:`, err.response?.status);
@@ -624,45 +613,19 @@ export default function CampaignDashboard() {
     setFiltersLoading(true);
     console.log("🟢 [Filters] Starting to load filter options...");
     try {
-      // Load filter options from database table via API with timeout
+      // Load filter options from database table via API
+      // API has 30-second timeout built-in, no need for additional Promise.race
       console.log("🟢 [Filters] Calling getCampaignDashboardFilters()...");
-      const options = await Promise.race([
-        getCampaignDashboardFilters(undefined, undefined, undefined),
-        new Promise<FilterOptions>((_, reject) => 
-          setTimeout(() => reject(new Error("Filter options request timed out")), 10000)
-        )
-      ]);
+      const options = await getCampaignDashboardFilters(undefined, undefined, undefined);
       
       console.log("🟢 [Filters] Filter options received from API");
-      console.log("🟢 [Filters] Response type:", typeof options);
-      console.log("🟢 [Filters] Response keys:", options ? Object.keys(options) : "null/undefined");
       console.log("🟢 [Filters] States count:", options?.states?.length || 0);
       console.log("🟢 [Filters] Cities count:", options?.cities?.length || 0);
       console.log("🟢 [Filters] Stores count:", options?.stores?.length || 0);
-      console.log("🟢 [Filters] Segment maps count:", options?.segment_maps?.length || 0);
       
       // Validate response structure
       if (!options) {
         throw new Error("Filter options response is null or undefined");
-      }
-      
-      if (!Array.isArray(options.states)) {
-        console.warn("⚠️ [Filters] States is not an array:", options.states);
-      }
-      if (!Array.isArray(options.cities)) {
-        console.warn("⚠️ [Filters] Cities is not an array:", options.cities);
-      }
-      if (!Array.isArray(options.stores)) {
-        console.warn("⚠️ [Filters] Stores is not an array:", options.stores);
-      }
-      if (!Array.isArray(options.segment_maps)) {
-        console.warn("⚠️ [Filters] Segment maps is not an array:", options.segment_maps);
-      }
-      
-      try {
-        console.log("🟢 [Filters] Full filter options:", JSON.stringify(options, null, 2));
-      } catch (e) {
-        console.log("🟢 [Filters] Filter options: [Unable to stringify]");
       }
       
       // Ensure all arrays exist, default to empty arrays if missing
@@ -678,25 +641,20 @@ export default function CampaignDashboard() {
       
       setFilterOptions(safeOptions);
       console.log("✅ [Filters] Filter options set successfully");
-      console.log("✅ [Filters] Final state - States:", safeOptions.states.length, "Cities:", safeOptions.cities.length, "Stores:", safeOptions.stores.length, "Segments:", safeOptions.segment_maps.length);
     } catch (err: any) {
-      // Safely log error - convert error object to string to avoid "Cannot convert object to primitive value"
       const errorDetails = err instanceof Error 
         ? `${err.name}: ${err.message}` 
         : typeof err === 'object' 
           ? JSON.stringify(err, Object.getOwnPropertyNames(err), 2)
           : String(err);
       console.error("❌ [Filters] Failed to load filter options from database:", errorDetails);
-      console.error("❌ [Filters] Error stack:", err instanceof Error ? err.stack : "No stack trace");
       
-      // Check if it's an HTTP error with response details
       if (err?.response) {
         console.error("❌ [Filters] HTTP Status:", err.response.status);
         console.error("❌ [Filters] HTTP Response:", err.response.data);
       }
       
       // Continue with empty options - filters will just be empty
-      // Don't block the page - allow user to use dashboard without filters
       setFilterOptions({
         states: [],
         cities: [],
@@ -708,7 +666,7 @@ export default function CampaignDashboard() {
       });
     } finally {
       setFiltersLoading(false);
-      console.log("🟢 [Filters] Filter loading completed, filtersLoading set to false");
+      console.log("🟢 [Filters] Filter loading completed");
     }
   }, []);
 
@@ -740,6 +698,7 @@ export default function CampaignDashboard() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty deps - only run on mount
+
 
   const handleApplyFilters = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
