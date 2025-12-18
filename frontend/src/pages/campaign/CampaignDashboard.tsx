@@ -19,6 +19,7 @@ import {
 import { 
   getCampaignDashboard,
   getCampaignDashboardFilters,
+  getStoreInfo,
   type CampaignDashboardFilters, 
   type CampaignKPIData, 
   type ChartDataPoint,
@@ -28,16 +29,15 @@ import {
   type FilterOptions,
 } from "../../api/campaign";
 import { extractApiErrorMessage } from "../../api/errors";
-import Autocomplete from "../../components/Autocomplete";
 import "../common/adminTheme.css";
 import "./CampaignDashboard.css";
 
 // Types
 interface DashboardFilters {
-  startDate: string;
-  endDate: string;
-  customerMobile: string;
-  customerName: string;
+  state: string;
+  city: string;
+  store: string;
+  segmentMap: string;
   rValueBucket: string;
   fValueBucket: string;
   mValueBucket: string;
@@ -103,15 +103,6 @@ const renderSegmentTreemapContent = (props: any) => {
 
 
 
-const CalendarIcon = memo(() => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-    <line x1="16" y1="2" x2="16" y2="6" />
-    <line x1="8" y1="2" x2="8" y2="6" />
-    <line x1="3" y1="10" x2="21" y2="10" />
-  </svg>
-));
-CalendarIcon.displayName = "CalendarIcon";
 
 // Lazy Chart Wrapper - Only renders when visible
 const LazyChart = memo(({ children, className = "" }: { children: React.ReactNode; className?: string }) => {
@@ -144,39 +135,20 @@ const LazyChart = memo(({ children, className = "" }: { children: React.ReactNod
 LazyChart.displayName = "LazyChart";
 
 export default function CampaignDashboard() {
-  // Calculate default date range (last one year)
-  const getDefaultEndDate = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  const getDefaultStartDate = () => {
-    const today = new Date();
-    const oneYearAgo = new Date(today);
-    oneYearAgo.setFullYear(today.getFullYear() - 1);
-    const year = oneYearAgo.getFullYear();
-    const month = String(oneYearAgo.getMonth() + 1).padStart(2, '0');
-    const day = String(oneYearAgo.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
   const [filters, setFilters] = useState<DashboardFilters>({
-    startDate: getDefaultStartDate(), // Default to one year ago
-    endDate: getDefaultEndDate(), // Default to today
-    customerMobile: "All",
-    customerName: "All",
+    state: "All",
+    city: "All",
+    store: "All",
+    segmentMap: "All",
     rValueBucket: "All",
     fValueBucket: "All",
     mValueBucket: "All",
   });
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
-    customer_mobiles: [],
-    customer_names: [],
-    customer_mobile_to_name: {},
-    customer_name_to_mobile: {},
+    states: [],
+    cities: [],
+    stores: [],
+    segment_maps: [],
     r_value_buckets: [],
     f_value_buckets: [],
     m_value_buckets: [],
@@ -190,7 +162,6 @@ export default function CampaignDashboard() {
   const [kpiData, setKpiData] = useState<CampaignKPIData>({
     total_customer: 0,
     unit_per_transaction: 0,
-    profit_per_customer: 0,
     customer_spending: 0,
     days_to_return: 0,
     retention_rate: 0,
@@ -210,17 +181,131 @@ export default function CampaignDashboard() {
   const handleFilterChange = (field: keyof DashboardFilters, value: string) => {
     setFilters((prev) => {
       const updated = { ...prev, [field]: value };
+      const currentState = prev.state;
       
-      // Sync customer mobile and customer name
-      if (field === "customerMobile" && value !== "All") {
-        const customerName = filterOptions.customer_mobile_to_name?.[value];
-        if (customerName) {
-          updated.customerName = customerName;
+      // Reset dependent filters when parent changes
+      if (field === "state") {
+        // Reset city and store when state changes
+        updated.city = "All";
+        updated.store = "All";
+        
+        // Reload cities and stores filtered by selected state
+        if (value !== "All") {
+          getCampaignDashboardFilters(value)
+            .then((options) => {
+              setFilterOptions((prevOptions) => ({
+                ...prevOptions,
+                cities: options.cities,
+                stores: options.stores,
+              }));
+            })
+            .catch((err) => {
+              console.error("Failed to load filtered options for state:", err);
+            });
+        } else {
+          // Reset to all options when state is "All"
+          getCampaignDashboardFilters()
+            .then((options) => {
+              setFilterOptions((prevOptions) => ({
+                ...prevOptions,
+                cities: options.cities,
+                stores: options.stores,
+              }));
+            })
+            .catch((err) => {
+              console.error("Failed to load all filter options:", err);
+            });
         }
-      } else if (field === "customerName" && value !== "All") {
-        const customerMobile = filterOptions.customer_name_to_mobile?.[value];
-        if (customerMobile) {
-          updated.customerMobile = customerMobile;
+      } else if (field === "city") {
+        // Reset store when city changes
+        updated.store = "All";
+        
+        // Reload stores filtered by selected state and city
+        if (value !== "All" && currentState !== "All") {
+          getCampaignDashboardFilters(currentState, value)
+            .then((options) => {
+              setFilterOptions((prevOptions) => ({
+                ...prevOptions,
+                stores: options.stores,
+              }));
+            })
+            .catch((err) => {
+              console.error("Failed to load filtered stores for city:", err);
+            });
+        } else if (value === "All" && currentState !== "All") {
+          // Load all stores for the state when city is reset to "All"
+          getCampaignDashboardFilters(currentState)
+            .then((options) => {
+              setFilterOptions((prevOptions) => ({
+                ...prevOptions,
+                stores: options.stores,
+              }));
+            })
+            .catch((err) => {
+              console.error("Failed to load stores for state:", err);
+            });
+        } else if (value === "All" && currentState === "All") {
+          // Load all stores when both state and city are "All"
+          getCampaignDashboardFilters()
+            .then((options) => {
+              setFilterOptions((prevOptions) => ({
+                ...prevOptions,
+                stores: options.stores,
+              }));
+            })
+            .catch((err) => {
+              console.error("Failed to load all stores:", err);
+            });
+        }
+      } else if (field === "store") {
+        // When store is selected, automatically set state and city
+        if (value !== "All") {
+          getStoreInfo(value)
+            .then((storeInfo) => {
+              if (storeInfo.state && storeInfo.city) {
+                const storeState = storeInfo.state;
+                const storeCity = storeInfo.city;
+                
+                // Update state and city automatically
+                setFilters((prevFilters) => ({
+                  ...prevFilters,
+                  state: storeState,
+                  city: storeCity,
+                  store: value,
+                }));
+                
+                // Reload filter options for the determined state and city
+                getCampaignDashboardFilters(storeState, storeCity)
+                  .then((options) => {
+                    setFilterOptions((prevOptions) => ({
+                      ...prevOptions,
+                      cities: options.cities,
+                      stores: options.stores,
+                    }));
+                  })
+                  .catch((err) => {
+                    console.error("Failed to load filter options for store:", err);
+                  });
+              } else {
+                console.warn(`Store info not found for: ${value}`);
+              }
+            })
+            .catch((err) => {
+              console.error("Failed to get store info:", err);
+            });
+        } else {
+          // When store is reset to "All", reload all options
+          getCampaignDashboardFilters()
+            .then((options) => {
+              setFilterOptions((prevOptions) => ({
+                ...prevOptions,
+                cities: options.cities,
+                stores: options.stores,
+              }));
+            })
+            .catch((err) => {
+              console.error("Failed to load all filter options:", err);
+            });
         }
       }
       
@@ -249,10 +334,10 @@ export default function CampaignDashboard() {
     // Log the actual API URL that will be called
     const apiUrl = filterParams 
       ? `/campaign/dashboard?${new URLSearchParams({
-          ...(filterParams.start_date && { start_date: filterParams.start_date }),
-          ...(filterParams.end_date && { end_date: filterParams.end_date }),
-          ...(filterParams.customer_mobile && { customer_mobile: filterParams.customer_mobile }),
-          ...(filterParams.customer_name && { customer_name: filterParams.customer_name }),
+          ...(filterParams.state && { state: filterParams.state }),
+          ...(filterParams.city && { city: filterParams.city }),
+          ...(filterParams.store && { store: filterParams.store }),
+          ...(filterParams.segment_map && { segment_map: filterParams.segment_map }),
           ...(filterParams.r_value_bucket && { r_value_bucket: filterParams.r_value_bucket }),
           ...(filterParams.f_value_bucket && { f_value_bucket: filterParams.f_value_bucket }),
           ...(filterParams.m_value_bucket && { m_value_bucket: filterParams.m_value_bucket }),
@@ -418,41 +503,93 @@ export default function CampaignDashboard() {
 
   const loadFilterOptions = useCallback(async () => {
     setFiltersLoading(true);
+    console.log("🟢 [Filters] Starting to load filter options...");
     try {
       // Load filter options from database table via API with timeout
+      console.log("🟢 [Filters] Calling getCampaignDashboardFilters()...");
       const options = await Promise.race([
         getCampaignDashboardFilters(),
         new Promise<FilterOptions>((_, reject) => 
           setTimeout(() => reject(new Error("Filter options request timed out")), 10000)
         )
       ]);
-      try {
-        console.log("Filter options loaded from database:", JSON.stringify(options, null, 2));
-      } catch (e) {
-        console.log("Filter options loaded from database: [Unable to stringify]");
+      
+      console.log("🟢 [Filters] Filter options received from API");
+      console.log("🟢 [Filters] Response type:", typeof options);
+      console.log("🟢 [Filters] Response keys:", options ? Object.keys(options) : "null/undefined");
+      console.log("🟢 [Filters] States count:", options?.states?.length || 0);
+      console.log("🟢 [Filters] Cities count:", options?.cities?.length || 0);
+      console.log("🟢 [Filters] Stores count:", options?.stores?.length || 0);
+      console.log("🟢 [Filters] Segment maps count:", options?.segment_maps?.length || 0);
+      
+      // Validate response structure
+      if (!options) {
+        throw new Error("Filter options response is null or undefined");
       }
-      setFilterOptions(options);
-    } catch (err) {
+      
+      if (!Array.isArray(options.states)) {
+        console.warn("⚠️ [Filters] States is not an array:", options.states);
+      }
+      if (!Array.isArray(options.cities)) {
+        console.warn("⚠️ [Filters] Cities is not an array:", options.cities);
+      }
+      if (!Array.isArray(options.stores)) {
+        console.warn("⚠️ [Filters] Stores is not an array:", options.stores);
+      }
+      if (!Array.isArray(options.segment_maps)) {
+        console.warn("⚠️ [Filters] Segment maps is not an array:", options.segment_maps);
+      }
+      
+      try {
+        console.log("🟢 [Filters] Full filter options:", JSON.stringify(options, null, 2));
+      } catch (e) {
+        console.log("🟢 [Filters] Filter options: [Unable to stringify]");
+      }
+      
+      // Ensure all arrays exist, default to empty arrays if missing
+      const safeOptions: FilterOptions = {
+        states: Array.isArray(options.states) ? options.states : [],
+        cities: Array.isArray(options.cities) ? options.cities : [],
+        stores: Array.isArray(options.stores) ? options.stores : [],
+        segment_maps: Array.isArray(options.segment_maps) ? options.segment_maps : [],
+        r_value_buckets: Array.isArray(options.r_value_buckets) ? options.r_value_buckets : ["1", "2", "3", "4", "5"],
+        f_value_buckets: Array.isArray(options.f_value_buckets) ? options.f_value_buckets : ["1", "2", "3", "4", "5"],
+        m_value_buckets: Array.isArray(options.m_value_buckets) ? options.m_value_buckets : ["1", "2", "3", "4", "5"],
+      };
+      
+      setFilterOptions(safeOptions);
+      console.log("✅ [Filters] Filter options set successfully");
+      console.log("✅ [Filters] Final state - States:", safeOptions.states.length, "Cities:", safeOptions.cities.length, "Stores:", safeOptions.stores.length, "Segments:", safeOptions.segment_maps.length);
+    } catch (err: any) {
       // Safely log error - convert error object to string to avoid "Cannot convert object to primitive value"
       const errorDetails = err instanceof Error 
         ? `${err.name}: ${err.message}` 
         : typeof err === 'object' 
           ? JSON.stringify(err, Object.getOwnPropertyNames(err), 2)
           : String(err);
-      console.error("Failed to load filter options from database:", errorDetails);
+      console.error("❌ [Filters] Failed to load filter options from database:", errorDetails);
+      console.error("❌ [Filters] Error stack:", err instanceof Error ? err.stack : "No stack trace");
+      
+      // Check if it's an HTTP error with response details
+      if (err?.response) {
+        console.error("❌ [Filters] HTTP Status:", err.response.status);
+        console.error("❌ [Filters] HTTP Response:", err.response.data);
+      }
+      
       // Continue with empty options - filters will just be empty
       // Don't block the page - allow user to use dashboard without filters
       setFilterOptions({
-        customer_mobiles: [],
-        customer_names: [],
-        customer_mobile_to_name: {},
-        customer_name_to_mobile: {},
-        r_value_buckets: [],
-        f_value_buckets: [],
-        m_value_buckets: [],
+        states: [],
+        cities: [],
+        stores: [],
+        segment_maps: [],
+        r_value_buckets: ["1", "2", "3", "4", "5"],
+        f_value_buckets: ["1", "2", "3", "4", "5"],
+        m_value_buckets: ["1", "2", "3", "4", "5"],
       });
     } finally {
       setFiltersLoading(false);
+      console.log("🟢 [Filters] Filter loading completed, filtersLoading set to false");
     }
   }, []);
 
@@ -469,13 +606,8 @@ export default function CampaignDashboard() {
     
     setTimeout(() => {
       loadFilterOptions();
-      // Load with default date range (last one year) on initial load
-      // Use filters state which now has default dates set
-      const defaultFilterParams: CampaignDashboardFilters = {
-        start_date: filters.startDate || getDefaultStartDate(),
-        end_date: filters.endDate || getDefaultEndDate(),
-      };
-      loadDashboardData(defaultFilterParams);
+      // Load with default filters (all "All" = no filters)
+      loadDashboardData({});
       initialLoadDoneRef.current = true; // Mark initial load as done
     }, 0);
     
@@ -495,13 +627,13 @@ export default function CampaignDashboard() {
     e.stopPropagation(); // Prevent event bubbling
     
     const filterParams: CampaignDashboardFilters = {};
-    if (filters.startDate) filterParams.start_date = filters.startDate;
-    if (filters.endDate) filterParams.end_date = filters.endDate;
-    if (filters.customerMobile !== "All") filterParams.customer_mobile = filters.customerMobile;
-    if (filters.customerName !== "All") filterParams.customer_name = filters.customerName;
-    if (filters.rValueBucket !== "All") filterParams.r_value_bucket = filters.rValueBucket;
-    if (filters.fValueBucket !== "All") filterParams.f_value_bucket = filters.fValueBucket;
-    if (filters.mValueBucket !== "All") filterParams.m_value_bucket = filters.mValueBucket;
+    if (filters.state.length > 0) filterParams.state = filters.state;
+    if (filters.city.length > 0) filterParams.city = filters.city;
+    if (filters.store.length > 0) filterParams.store = filters.store;
+    if (filters.segmentMap.length > 0) filterParams.segment_map = filters.segmentMap;
+    if (filters.rValueBucket.length > 0) filterParams.r_value_bucket = filters.rValueBucket;
+    if (filters.fValueBucket.length > 0) filterParams.f_value_bucket = filters.fValueBucket;
+    if (filters.mValueBucket.length > 0) filterParams.m_value_bucket = filters.mValueBucket;
     
     // Load with filter application flag set to true
     await loadDashboardData(filterParams, true);
@@ -528,7 +660,6 @@ export default function CampaignDashboard() {
   const displayKPIData = useMemo(() => ({
     totalCustomer: kpiData.total_customer,
     unitPerTransaction: kpiData.unit_per_transaction,
-    profitPerCustomer: kpiData.profit_per_customer,
     customerSpending: kpiData.customer_spending,
     daysToReturn: kpiData.days_to_return,
     retentionRate: kpiData.retention_rate,
@@ -544,6 +675,52 @@ export default function CampaignDashboard() {
       </div>
 
       {/* Filters Section */}
+      {filtersLoading && (
+        <div style={{ 
+          padding: "12px 16px", 
+          marginBottom: "16px",
+          background: "#f0f9ff",
+          border: "1px solid #0ea5e9",
+          borderRadius: "6px",
+          color: "#0369a1"
+        }}>
+          Loading filter options...
+        </div>
+      )}
+      {!filtersLoading && filterOptions.states.length === 0 && filterOptions.cities.length === 0 && filterOptions.stores.length === 0 && (
+        <div style={{ 
+          padding: "12px 16px", 
+          marginBottom: "16px",
+          background: "#fef2f2",
+          border: "1px solid #ef4444",
+          borderRadius: "6px",
+          color: "#dc2626",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "12px"
+        }}>
+          <span>⚠️ Filter options failed to load. Please check the browser console for details.</span>
+          <button 
+            type="button"
+            onClick={() => {
+              console.log("🟢 [Filters] Manual retry triggered");
+              loadFilterOptions();
+            }}
+            style={{
+              padding: "6px 12px",
+              background: "#ef4444",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "13px"
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <form 
         className="dashboard-filters filters" 
         onSubmit={handleApplyFilters}
@@ -555,51 +732,93 @@ export default function CampaignDashboard() {
         }}
       >
         <div className="filter-row">
-          <div className="filter-group filter-item date-field">
-            <label>Start Date</label>
-            <div className="date-input-wrapper">
-              <CalendarIcon />
-              <input
-                type="date"
-                value={filters.startDate}
-                onChange={(e) => handleFilterChange("startDate", e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="filter-group filter-item date-field">
-            <label>End Date</label>
-            <div className="date-input-wrapper">
-              <CalendarIcon />
-              <input
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => handleFilterChange("endDate", e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="filter-group filter-item autocomplete-field">
-            <label>Customer Mobile No</label>
-            <Autocomplete
-              value={filters.customerMobile}
-              options={filterOptions.customer_mobiles}
-              onChange={(value) => handleFilterChange("customerMobile", value)}
-              placeholder="Mobile number"
+          <div className="filter-group filter-item select-field">
+            <label>State</label>
+            <select
+              className="filter-select"
+              value={filters.state}
+              onChange={(e) => handleFilterChange("state", e.target.value)}
               disabled={filtersLoading}
-              allowAll={true}
-              allLabel="All"
-            />
+            >
+              <option>All</option>
+              {filtersLoading ? (
+                <option>Loading...</option>
+              ) : filterOptions.states && filterOptions.states.length > 0 ? (
+                filterOptions.states.map((state) => (
+                  <option key={state} value={state}>
+                    {state}
+                  </option>
+                ))
+              ) : (
+                <option disabled>No states available</option>
+              )}
+            </select>
           </div>
-          <div className="filter-group filter-item autocomplete-field">
-            <label>Customer Name</label>
-            <Autocomplete
-              value={filters.customerName}
-              options={filterOptions.customer_names}
-              onChange={(value) => handleFilterChange("customerName", value)}
-              placeholder="Customer name"
+          <div className="filter-group filter-item select-field">
+            <label>City</label>
+            <select
+              className="filter-select"
+              value={filters.city}
+              onChange={(e) => handleFilterChange("city", e.target.value)}
               disabled={filtersLoading}
-              allowAll={true}
-              allLabel="All"
-            />
+            >
+              <option>All</option>
+              {filtersLoading ? (
+                <option>Loading...</option>
+              ) : filterOptions.cities && filterOptions.cities.length > 0 ? (
+                filterOptions.cities.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))
+              ) : (
+                <option disabled>No cities available</option>
+              )}
+            </select>
+          </div>
+          <div className="filter-group filter-item select-field">
+            <label>Store</label>
+            <select
+              className="filter-select"
+              value={filters.store}
+              onChange={(e) => handleFilterChange("store", e.target.value)}
+              disabled={filtersLoading}
+            >
+              <option>All</option>
+              {filtersLoading ? (
+                <option>Loading...</option>
+              ) : filterOptions.stores && filterOptions.stores.length > 0 ? (
+                filterOptions.stores.map((store) => (
+                  <option key={store} value={store}>
+                    {store}
+                  </option>
+                ))
+              ) : (
+                <option disabled>No stores available</option>
+              )}
+            </select>
+          </div>
+          <div className="filter-group filter-item select-field">
+            <label>Segment Map</label>
+            <select
+              className="filter-select"
+              value={filters.segmentMap}
+              onChange={(e) => handleFilterChange("segmentMap", e.target.value)}
+              disabled={filtersLoading}
+            >
+              <option>All</option>
+              {filtersLoading ? (
+                <option>Loading...</option>
+              ) : filterOptions.segment_maps && filterOptions.segment_maps.length > 0 ? (
+                filterOptions.segment_maps.map((segment) => (
+                  <option key={segment} value={segment}>
+                    {segment}
+                  </option>
+                ))
+              ) : (
+                <option disabled>No segments available</option>
+              )}
+            </select>
           </div>
           <div className="filter-group filter-item select-field">
             <label>R Score</label>
@@ -718,10 +937,6 @@ export default function CampaignDashboard() {
         <div className="metric-card-total_profit">
           <h4>Unit Per Transaction</h4>
           <p>{formatNumber(displayKPIData.unitPerTransaction)}</p>
-        </div>
-        <div className="metric-card-total_unit">
-          <h4>Profit Per Customer</h4>
-          <p>{formatCurrency(displayKPIData.profitPerCustomer)}</p>
         </div>
         <div className="metric-card-total_spending">
           <h4>Avg Customer Spend</h4>

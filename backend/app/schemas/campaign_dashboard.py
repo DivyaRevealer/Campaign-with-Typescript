@@ -9,7 +9,6 @@ class CampaignKPIData(BaseModel):
 
     total_customer: float = Field(description="Total number of customers")
     unit_per_transaction: float = Field(description="Average units per transaction")
-    profit_per_customer: float = Field(description="Average profit per customer")
     customer_spending: float = Field(description="Total customer spending")
     days_to_return: float = Field(description="Average days to return")
     retention_rate: float = Field(description="Customer retention rate percentage")
@@ -49,10 +48,10 @@ class FiscalYearData(BaseModel):
 class CampaignDashboardFilters(BaseModel):
     """Filters for campaign dashboard query."""
 
-    start_date: Optional[str] = Field(default=None, description="Start date (YYYY-MM-DD)")
-    end_date: Optional[str] = Field(default=None, description="End date (YYYY-MM-DD)")
-    customer_mobile: Optional[str] = Field(default=None, description="Filter by customer mobile number")
-    customer_name: Optional[str] = Field(default=None, description="Filter by customer name")
+    state: Optional[str] = Field(default=None, description="Filter by state")
+    city: Optional[str] = Field(default=None, description="Filter by city")
+    store: Optional[str] = Field(default=None, description="Filter by store name")
+    segment_map: Optional[str] = Field(default=None, description="Filter by segment map")
     r_value_bucket: Optional[str] = Field(default=None, description="Filter by R value bucket")
     f_value_bucket: Optional[str] = Field(default=None, description="Filter by F value bucket")
     m_value_bucket: Optional[str] = Field(default=None, description="Filter by M value bucket")
@@ -61,10 +60,10 @@ class CampaignDashboardFilters(BaseModel):
 class FilterOptions(BaseModel):
     """Available filter options for dropdowns."""
 
-    customer_mobiles: List[str] = Field(default_factory=list, description="List of customer mobile numbers")
-    customer_names: List[str] = Field(default_factory=list, description="List of customer names")
-    customer_mobile_to_name: Dict[str, str] = Field(default_factory=dict, description="Mapping of customer mobile to customer name")
-    customer_name_to_mobile: Dict[str, str] = Field(default_factory=dict, description="Mapping of customer name to customer mobile")
+    states: List[str] = Field(default_factory=list, description="List of states")
+    cities: List[str] = Field(default_factory=list, description="List of cities")
+    stores: List[str] = Field(default_factory=list, description="List of store names")
+    segment_maps: List[str] = Field(default_factory=list, description="List of segment maps")
     r_value_buckets: List[str] = Field(default_factory=list, description="List of R value buckets")
     f_value_buckets: List[str] = Field(default_factory=list, description="List of F value buckets")
     m_value_buckets: List[str] = Field(default_factory=list, description="List of M value buckets")

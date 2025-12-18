@@ -218,7 +218,6 @@ export const downloadCampaignContacts = async (campaignId: number, campaignName:
 export interface CampaignKPIData {
   total_customer: number;
   unit_per_transaction: number;
-  profit_per_customer: number;
   customer_spending: number;
   days_to_return: number;
   retention_rate: number;
@@ -248,20 +247,20 @@ export interface FiscalYearData {
 }
 
 export interface CampaignDashboardFilters {
-  start_date?: string;
-  end_date?: string;
-  customer_mobile?: string;
-  customer_name?: string;
+  state?: string;
+  city?: string;
+  store?: string;
+  segment_map?: string;
   r_value_bucket?: string;
   f_value_bucket?: string;
   m_value_bucket?: string;
 }
 
 export interface FilterOptions {
-  customer_mobiles: string[];
-  customer_names: string[];
-  customer_mobile_to_name?: Record<string, string>;
-  customer_name_to_mobile?: Record<string, string>;
+  states: string[];
+  cities: string[];
+  stores: string[];
+  segment_maps: string[];
   r_value_buckets: string[];
   f_value_buckets: string[];
   m_value_buckets: string[];
@@ -286,10 +285,10 @@ export const getCampaignDashboard = (
   signal?: AbortSignal,
 ): Promise<CampaignDashboardOut> => {
   const params = new URLSearchParams();
-  if (filters?.start_date) params.append("start_date", filters.start_date);
-  if (filters?.end_date) params.append("end_date", filters.end_date);
-  if (filters?.customer_mobile) params.append("customer_mobile", filters.customer_mobile);
-  if (filters?.customer_name) params.append("customer_name", filters.customer_name);
+  if (filters?.state) params.append("state", filters.state);
+  if (filters?.city) params.append("city", filters.city);
+  if (filters?.store) params.append("store", filters.store);
+  if (filters?.segment_map) params.append("segment_map", filters.segment_map);
   if (filters?.r_value_bucket) params.append("r_value_bucket", filters.r_value_bucket);
   if (filters?.f_value_bucket) params.append("f_value_bucket", filters.f_value_bucket);
   if (filters?.m_value_bucket) params.append("m_value_bucket", filters.m_value_bucket);
@@ -301,7 +300,16 @@ export const getCampaignDashboard = (
   return http.get<CampaignDashboardOut>(url, { timeout: 180000, signal }).then((r) => r.data);
 };
 
-export const getCampaignDashboardFilters = (): Promise<FilterOptions> => {
+export const getCampaignDashboardFilters = (state?: string, city?: string): Promise<FilterOptions> => {
   // Add timeout of 10 seconds for filter options (should be fast)
-  return http.get<FilterOptions>("/campaign/dashboard/filters", { timeout: 10000 }).then((r) => r.data);
+  const params = new URLSearchParams();
+  if (state && state !== "All") params.append("state", state);
+  if (city && city !== "All") params.append("city", city);
+  const queryString = params.toString();
+  const url = `/campaign/dashboard/filters${queryString ? `?${queryString}` : ""}`;
+  return http.get<FilterOptions>(url, { timeout: 10000 }).then((r) => r.data);
+};
+
+export const getStoreInfo = (store: string): Promise<{ state: string | null; city: string | null }> => {
+  return http.get<{ state: string | null; city: string | null }>(`/campaign/dashboard/filters/store-info?store=${encodeURIComponent(store)}`, { timeout: 10000 }).then((r) => r.data);
 };

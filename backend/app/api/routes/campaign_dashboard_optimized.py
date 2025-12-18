@@ -38,53 +38,27 @@ STALE_CACHE_TTL = 7200  # Serve stale cache for up to 2 hours while refreshing
 
 
 def _apply_base_filters(query, filters: dict):
-    """Apply common filters to a query. Optimized with indexed columns.
+    """Apply common filters to a query. Optimized with indexed columns."""
     
-    IMPORTANT: Date filters are REQUIRED to prevent full table scans.
-    If dates are missing or invalid, this function will raise an exception.
-    """
-    from datetime import datetime as dt
+    # State filter
+    state = filters.get("state")
+    if state and state != "All" and state.strip():
+        query = query.where(InvCrmAnalysisTcm.last_in_store_state == state)
     
-    # Date filters - use indexed FIRST_IN_DATE
-    # CRITICAL: Always require date filters to prevent full table scans
-    start_date = filters.get("start_date")
-    if not start_date or not start_date.strip():
-        raise ValueError("start_date filter is required to prevent full table scan")
+    # City filter
+    city = filters.get("city")
+    if city and city != "All" and city.strip():
+        query = query.where(InvCrmAnalysisTcm.last_in_store_city == city)
     
-    # Convert string to date object for proper comparison
-    try:
-        if isinstance(start_date, str):
-            start_date_obj = dt.strptime(start_date.strip(), "%Y-%m-%d").date()
-        else:
-            start_date_obj = start_date
-        query = query.where(InvCrmAnalysisTcm.first_in_date >= start_date_obj)
-    except (ValueError, TypeError) as e:
-        # Invalid date format - raise error instead of silently skipping (prevents full table scan)
-        raise ValueError(f"Invalid start_date format '{start_date}'. Expected YYYY-MM-DD format. Error: {e}")
+    # Store filter (using store name)
+    store = filters.get("store")
+    if store and store != "All" and store.strip():
+        query = query.where(InvCrmAnalysisTcm.last_in_store_name == store)
     
-    end_date = filters.get("end_date")
-    if not end_date or not end_date.strip():
-        raise ValueError("end_date filter is required to prevent full table scan")
-    
-    # Convert string to date object for proper comparison
-    try:
-        if isinstance(end_date, str):
-            end_date_obj = dt.strptime(end_date.strip(), "%Y-%m-%d").date()
-        else:
-            end_date_obj = end_date
-        query = query.where(InvCrmAnalysisTcm.first_in_date <= end_date_obj)
-    except (ValueError, TypeError) as e:
-        # Invalid date format - raise error instead of silently skipping (prevents full table scan)
-        raise ValueError(f"Invalid end_date format '{end_date}'. Expected YYYY-MM-DD format. Error: {e}")
-    
-    # Customer filters - use indexed columns
-    customer_mobile = filters.get("customer_mobile")
-    if customer_mobile and customer_mobile != "All" and customer_mobile.strip():
-        query = query.where(InvCrmAnalysisTcm.cust_mobileno == customer_mobile)
-    
-    customer_name = filters.get("customer_name")
-    if customer_name and customer_name != "All" and customer_name.strip():
-        query = query.where(InvCrmAnalysisTcm.customer_name == customer_name)
+    # Segment Map filter
+    segment_map = filters.get("segment_map")
+    if segment_map and segment_map != "All" and segment_map.strip():
+        query = query.where(InvCrmAnalysisTcm.segment_map == segment_map)
     
     # R value bucket filter - use indexed R_SCORE (score 1-5)
     r_value_bucket = filters.get("r_value_bucket")
@@ -319,7 +293,6 @@ async def _get_kpi_data_optimized(
                 return CampaignKPIData(
                     total_customer=0.0,
                     unit_per_transaction=0.0,
-                    profit_per_customer=0.0,
                     customer_spending=0.0,
                     days_to_return=0.0,
                     retention_rate=0.0,
@@ -340,16 +313,9 @@ async def _get_kpi_data_optimized(
             # Calculate retention rate
             retention_rate = (returning_customers / total_customer * 100) if total_customer > 0 else 0.0
             
-            # Calculate profit per customer: Since profit data is not available, 
-            # we'll use average transaction value (same as customer_spending) as a proxy
-            # This represents average revenue per customer, which is meaningful for campaigns
-            # Note: This is the same as customer_spending (avg), but kept separate for clarity
-            profit_per_customer = customer_spending_avg
-            
             return CampaignKPIData(
                 total_customer=total_customer,
                 unit_per_transaction=float(row.unit_per_transaction or 0.0),
-                profit_per_customer=profit_per_customer,
                 customer_spending=float(row.customer_spending or 0.0),
                 days_to_return=float(row.days_to_return or 0.0),
                 retention_rate=retention_rate,
@@ -388,7 +354,6 @@ async def _get_kpi_data_optimized(
         return CampaignKPIData(
             total_customer=0.0,
             unit_per_transaction=0.0,
-            profit_per_customer=0.0,
             customer_spending=0.0,
             days_to_return=0.0,
             retention_rate=0.0,
@@ -612,18 +577,14 @@ async def _warm_cache_on_startup():
     """Warm cache on server startup for default filters (non-blocking)."""
     try:
         from app.core.db import SessionLocal
-        from datetime import datetime, timedelta
         
         async with SessionLocal() as session:
-            # Warm cache for default date range (last 3 months)
-            today = datetime.now().date()
-            three_months_ago = today - timedelta(days=90)
-            
+            # Warm cache for default filters (no filters = all data)
             default_filters = {
-                "start_date": three_months_ago.strftime("%Y-%m-%d"),
-                "end_date": today.strftime("%Y-%m-%d"),
-                "customer_mobile": None,
-                "customer_name": None,
+                "state": None,
+                "city": None,
+                "store": None,
+                "segment_map": None,
                 "r_value_bucket": None,
                 "f_value_bucket": None,
                 "m_value_bucket": None,
@@ -709,10 +670,10 @@ async def _refresh_cache_background(
 @router.get("/dashboard", response_model=CampaignDashboardOut)
 async def get_campaign_dashboard_optimized(
     request: Request,
-    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-    customer_mobile: Optional[str] = Query(None, description="Filter by customer mobile"),
-    customer_name: Optional[str] = Query(None, description="Filter by customer name"),
+    state: Optional[str] = Query(None, description="Filter by state"),
+    city: Optional[str] = Query(None, description="Filter by city"),
+    store: Optional[str] = Query(None, description="Filter by store name"),
+    segment_map: Optional[str] = Query(None, description="Filter by segment map"),
     r_value_bucket: Optional[str] = Query(None, description="Filter by R value bucket"),
     f_value_bucket: Optional[str] = Query(None, description="Filter by F value bucket"),
     m_value_bucket: Optional[str] = Query(None, description="Filter by M value bucket"),
@@ -729,66 +690,18 @@ async def get_campaign_dashboard_optimized(
     - Optimized SQL queries with indexes
     - Single query for KPI metrics
     - SQL aggregation instead of Python processing
-    
-    Expected response time: ~15-30 seconds for 3 months of data (down from ~78 seconds)
     """
     
-    # Set default date range to last 3 months if no dates provided
-    # CRITICAL: Always set date filters to prevent full table scans
-    today = datetime.now().date()
-    three_months_ago = today - timedelta(days=90)
-    
-    # Normalize filters with default date range (last 3 months)
-    # Ensure dates are ALWAYS set (never None or empty) to prevent full table scans
-    normalized_start_date = start_date.strip() if start_date and start_date.strip() else None
-    normalized_end_date = end_date.strip() if end_date and end_date.strip() else None
-    
-    # Validate date formats if provided, otherwise use defaults
-    start_date_obj = None
-    end_date_obj = None
-    
-    if normalized_start_date:
-        try:
-            start_date_obj = datetime.strptime(normalized_start_date, "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid start_date format '{start_date}'. Expected YYYY-MM-DD format."
-            )
-    else:
-        normalized_start_date = three_months_ago.strftime("%Y-%m-%d")
-        start_date_obj = three_months_ago
-    
-    if normalized_end_date:
-        try:
-            end_date_obj = datetime.strptime(normalized_end_date, "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid end_date format '{end_date}'. Expected YYYY-MM-DD format."
-            )
-    else:
-        normalized_end_date = today.strftime("%Y-%m-%d")
-        end_date_obj = today
-    
-    # Ensure start_date <= end_date (compare date objects, not strings)
-    if start_date_obj > end_date_obj:
-        raise HTTPException(
-            status_code=400,
-            detail=f"start_date ({normalized_start_date}) must be less than or equal to end_date ({normalized_end_date})"
-        )
-    
+    # Normalize filters
     filters = {
-        "start_date": normalized_start_date,  # Always set (never None/empty)
-        "end_date": normalized_end_date,  # Always set (never None/empty)
-        "customer_mobile": customer_mobile if customer_mobile and customer_mobile != "All" and customer_mobile.strip() else None,
-        "customer_name": customer_name if customer_name and customer_name != "All" and customer_name.strip() else None,
+        "state": state if state and state != "All" and state.strip() else None,
+        "city": city if city and city != "All" and city.strip() else None,
+        "store": store if store and store != "All" and store.strip() else None,
+        "segment_map": segment_map if segment_map and segment_map != "All" and segment_map.strip() else None,
         "r_value_bucket": r_value_bucket if r_value_bucket and r_value_bucket != "All" and r_value_bucket.strip() else None,
         "f_value_bucket": f_value_bucket if f_value_bucket and f_value_bucket != "All" and f_value_bucket.strip() else None,
         "m_value_bucket": m_value_bucket if m_value_bucket and m_value_bucket != "All" and m_value_bucket.strip() else None,
     }
-    
-    # Date filters are now guaranteed to be set (prevents full table scans)
     
     # Generate cache key from filters
     cache_key = generate_cache_key("campaign_dashboard", **filters)
@@ -950,62 +863,127 @@ async def get_campaign_dashboard_optimized(
         )
 
 
+@router.get("/dashboard/filters/store-info")
+async def get_store_info(
+    store: str = Query(..., description="Store name to get state and city for"),
+    session: AsyncSession = Depends(get_session),
+    user: InvUserMaster = Depends(get_current_user),
+):
+    """Get state and city for a specific store name."""
+    try:
+        query = select(
+            InvCrmAnalysisTcm.last_in_store_state,
+            InvCrmAnalysisTcm.last_in_store_city
+        ).where(
+            and_(
+                InvCrmAnalysisTcm.last_in_store_name == store,
+                InvCrmAnalysisTcm.last_in_store_state.isnot(None),
+                InvCrmAnalysisTcm.last_in_store_city.isnot(None),
+            )
+        ).distinct().limit(1)
+        
+        result = await session.execute(query)
+        row = result.first()
+        
+        if row:
+            return {
+                "state": str(row.last_in_store_state).strip() if row.last_in_store_state else None,
+                "city": str(row.last_in_store_city).strip() if row.last_in_store_city else None,
+            }
+        else:
+            return {"state": None, "city": None}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting store info: {str(e)}"
+        )
+
+
 @router.get("/dashboard/filters", response_model=FilterOptions)
 async def get_campaign_dashboard_filters_optimized(
+    state: Optional[str] = Query(None, description="Filter cities and stores by state"),
+    city: Optional[str] = Query(None, description="Filter stores by city"),
     session: AsyncSession = Depends(get_session),
     user: InvUserMaster = Depends(get_current_user),
 ) -> FilterOptions:
     """
-    OPTIMIZED: Get filter options with caching.
+    OPTIMIZED: Get filter options with caching and dependent filtering.
     Filter options change infrequently, so caching is very effective here.
+    
+    Dependent filters:
+    - Cities are filtered by state (if state provided)
+    - Stores are filtered by state and city (if provided)
     """
     
-    # Updated cache key to force refresh after switching from VALUE to SCORE
-    cache_key = "campaign_dashboard_filters_v2_scores"
+    # Generate cache key including state/city for dependent filters
+    cache_key = f"campaign_dashboard_filters_v3_{state or 'all'}_{city or 'all'}"
     
     # Try cache first
     cached_result = await get_cache(cache_key)
     if cached_result:
+        print(f"🟢 [Filters] Returning cached result for key: {cache_key}")
+        print(f"🟢 [Filters] Cached states count: {len(cached_result.get('states', []))}")
         return FilterOptions(**cached_result)
+    else:
+        print(f"🟢 [Filters] No cache found for key: {cache_key}, querying database...")
     
     try:
-        # Get distinct mobile and name pairs to create mapping
-        mobile_name_query = select(
-            InvCrmAnalysisTcm.cust_mobileno,
-            InvCrmAnalysisTcm.customer_name
-        ).distinct().where(
+        print(f"🟢 [Filters] Loading filter options (state={state}, city={city})")
+        
+        # Get distinct states (always return all states)
+        states_query = select(InvCrmAnalysisTcm.last_in_store_state).distinct().where(
             and_(
-                InvCrmAnalysisTcm.cust_mobileno.isnot(None),
-                InvCrmAnalysisTcm.cust_mobileno != "",
-                InvCrmAnalysisTcm.customer_name.isnot(None),
-                InvCrmAnalysisTcm.customer_name != "",
+                InvCrmAnalysisTcm.last_in_store_state.isnot(None),
+                InvCrmAnalysisTcm.last_in_store_state != "",
             )
-        ).order_by(InvCrmAnalysisTcm.cust_mobileno).limit(1000)  # Limit for performance
+        ).order_by(InvCrmAnalysisTcm.last_in_store_state)
+        states_results = await session.execute(states_query)
+        states = sorted([str(row.last_in_store_state).strip() for row in states_results.all() if row.last_in_store_state])
+        print(f"🟢 [Filters] Found {len(states)} states")
         
-        mobile_name_results = await session.execute(mobile_name_query)
-        mobile_name_pairs = mobile_name_results.all()
+        # Get distinct cities (filtered by state if provided)
+        cities_query = select(InvCrmAnalysisTcm.last_in_store_city).distinct().where(
+            and_(
+                InvCrmAnalysisTcm.last_in_store_city.isnot(None),
+                InvCrmAnalysisTcm.last_in_store_city != "",
+            )
+        )
+        if state and state != "All" and state.strip():
+            cities_query = cities_query.where(InvCrmAnalysisTcm.last_in_store_state == state)
+            print(f"🟢 [Filters] Filtering cities by state: {state}")
+        cities_query = cities_query.order_by(InvCrmAnalysisTcm.last_in_store_city)
+        cities_results = await session.execute(cities_query)
+        cities = sorted([str(row.last_in_store_city).strip() for row in cities_results.all() if row.last_in_store_city])
+        print(f"🟢 [Filters] Found {len(cities)} cities")
         
-        # Build mappings and lists
-        customer_mobile_to_name: dict[str, str] = {}
-        customer_name_to_mobile: dict[str, str] = {}
-        customer_mobiles_set: set[str] = set()
-        customer_names_set: set[str] = set()
+        # Get distinct store names (filtered by state and city if provided)
+        stores_query = select(InvCrmAnalysisTcm.last_in_store_name).distinct().where(
+            and_(
+                InvCrmAnalysisTcm.last_in_store_name.isnot(None),
+                InvCrmAnalysisTcm.last_in_store_name != "",
+            )
+        )
+        if state and state != "All" and state.strip():
+            stores_query = stores_query.where(InvCrmAnalysisTcm.last_in_store_state == state)
+            print(f"🟢 [Filters] Filtering stores by state: {state}")
+        if city and city != "All" and city.strip():
+            stores_query = stores_query.where(InvCrmAnalysisTcm.last_in_store_city == city)
+            print(f"🟢 [Filters] Filtering stores by city: {city}")
+        stores_query = stores_query.order_by(InvCrmAnalysisTcm.last_in_store_name).limit(1000)  # Limit for performance
+        stores_results = await session.execute(stores_query)
+        stores = sorted([str(row.last_in_store_name).strip() for row in stores_results.all() if row.last_in_store_name])
+        print(f"🟢 [Filters] Found {len(stores)} stores")
         
-        for row in mobile_name_pairs:
-            mobile = str(row.cust_mobileno).strip() if row.cust_mobileno else ""
-            name = str(row.customer_name).strip() if row.customer_name else ""
-            
-            if mobile and name:
-                customer_mobiles_set.add(mobile)
-                customer_names_set.add(name)
-                # Use first occurrence for mapping (or you could use most recent)
-                if mobile not in customer_mobile_to_name:
-                    customer_mobile_to_name[mobile] = name
-                if name not in customer_name_to_mobile:
-                    customer_name_to_mobile[name] = mobile
-        
-        customer_mobiles = sorted(list(customer_mobiles_set))
-        customer_names = sorted(list(customer_names_set))
+        # Get distinct segment maps
+        segments_query = select(InvCrmAnalysisTcm.segment_map).distinct().where(
+            and_(
+                InvCrmAnalysisTcm.segment_map.isnot(None),
+                InvCrmAnalysisTcm.segment_map != "",
+            )
+        ).order_by(InvCrmAnalysisTcm.segment_map)
+        segments_results = await session.execute(segments_query)
+        segment_maps = sorted([str(row.segment_map).strip() for row in segments_results.all() if row.segment_map])
+        print(f"🟢 [Filters] Found {len(segment_maps)} segment maps")
         
         # Predefined score values (1-5 for all RFM scores)
         r_value_buckets = ["1", "2", "3", "4", "5"]  # R score values
@@ -1013,14 +991,17 @@ async def get_campaign_dashboard_filters_optimized(
         m_value_buckets = ["1", "2", "3", "4", "5"]  # M score values
         
         result = FilterOptions(
-            customer_mobiles=customer_mobiles,
-            customer_names=customer_names,
-            customer_mobile_to_name=customer_mobile_to_name,
-            customer_name_to_mobile=customer_name_to_mobile,
+            states=states,
+            cities=cities,
+            stores=stores,
+            segment_maps=segment_maps,
             r_value_buckets=r_value_buckets,
             f_value_buckets=f_value_buckets,
             m_value_buckets=m_value_buckets,
         )
+        
+        print(f"✅ [Filters] Filter options created successfully")
+        print(f"✅ [Filters] Returning: states={len(states)}, cities={len(cities)}, stores={len(stores)}, segments={len(segment_maps)}")
         
         # Cache for 1 hour (filter options change infrequently)
         await set_cache(cache_key, result.model_dump(), 3600)
