@@ -18,9 +18,8 @@ from app.models.inv_create_campaign import InvCreateCampaign
 from app.models.inv_campaign_brand_filter import InvCampaignBrandFilter
 from app.models.inv_campaign_upload import InvCampaignUpload
 from app.models.inv_template_detail import InvTemplateDetail
-from app.models.dim_state import DimState
-from app.models.dim_city import DimCity
-from app.models.dim_store import DimStore
+from app.models.dim_store_location import DimStoreLocation
+from app.models.crm_store_dependency import CrmStoreDependency
 
 __all__ = [
     "Base",
@@ -45,7 +44,6 @@ __all__ = [
     "InvCampaignBrandFilter",
     "InvCampaignUpload",
     "InvTemplateDetail",
-    "DimState",
-    "DimCity",
-    "DimStore",
+    "DimStoreLocation",
+    "CrmStoreDependency",
 ]

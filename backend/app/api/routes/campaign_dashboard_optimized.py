@@ -19,6 +19,7 @@ from app.core.deps import get_current_user
 from app.core.cache import get_cache, set_cache, generate_cache_key
 from app.models.inv_crm_analysis_tcm import InvCrmAnalysisTcm
 from app.models.inv_user import InvUserMaster
+from app.models.crm_store_dependency import CrmStoreDependency
 from app.schemas.campaign_dashboard import (
     CampaignDashboardOut,
     CampaignKPIData,
@@ -899,26 +900,26 @@ async def get_store_info(
     session: AsyncSession = Depends(get_session),
     user: InvUserMaster = Depends(get_current_user),
 ):
-    """Get state and city for a specific store name. Returns first matching state/city."""
+    """
+    Get state and city for a store from crm_store_dependency table.
+    """
     try:
+        # Query crm_store_dependency table for store info (fast indexed lookup)
         query = select(
-            InvCrmAnalysisTcm.last_in_store_state,
-            InvCrmAnalysisTcm.last_in_store_city
+            CrmStoreDependency.state,
+            CrmStoreDependency.city
         ).where(
-            and_(
-                InvCrmAnalysisTcm.last_in_store_name == store,
-                InvCrmAnalysisTcm.last_in_store_state.isnot(None),
-                InvCrmAnalysisTcm.last_in_store_city.isnot(None),
-            )
-        ).distinct().limit(1)
+            CrmStoreDependency.store_name == store
+        ).limit(1)
         
         result = await session.execute(query)
         row = result.first()
         
         if row:
+            # Access row data by index (0 = state, 1 = city)
             return {
-                "state": str(row.last_in_store_state).strip() if row.last_in_store_state else None,
-                "city": str(row.last_in_store_city).strip() if row.last_in_store_city else None,
+                "state": str(row[0]).strip() if row[0] else None,
+                "city": str(row[1]).strip() if row[1] else None,
             }
         else:
             return {"state": None, "city": None}
@@ -935,29 +936,29 @@ async def get_stores_info(
     session: AsyncSession = Depends(get_session),
     user: InvUserMaster = Depends(get_current_user),
 ):
-    """Get all unique states and cities for multiple store names. Used for multi-select cascading."""
+    """
+    Get all unique states and cities for stores from crm_store_dependency table.
+    """
     try:
         # Filter out "All" and empty values
         valid_stores = [s for s in stores if s and s != "All" and str(s).strip()]
         if not valid_stores:
             return {"states": [], "cities": []}
         
+        # Query crm_store_dependency table for store info (fast indexed lookup)
         query = select(
-            InvCrmAnalysisTcm.last_in_store_state,
-            InvCrmAnalysisTcm.last_in_store_city
-        ).distinct().where(
-            and_(
-                InvCrmAnalysisTcm.last_in_store_name.in_(valid_stores),
-                InvCrmAnalysisTcm.last_in_store_state.isnot(None),
-                InvCrmAnalysisTcm.last_in_store_city.isnot(None),
-            )
-        )
+            CrmStoreDependency.state,
+            CrmStoreDependency.city
+        ).where(
+            CrmStoreDependency.store_name.in_(valid_stores)
+        ).distinct()
         
         result = await session.execute(query)
         rows = result.all()
         
-        states = sorted(set([str(row.last_in_store_state).strip() for row in rows if row.last_in_store_state]))
-        cities = sorted(set([str(row.last_in_store_city).strip() for row in rows if row.last_in_store_city]))
+        # Access row data by index (0 = state, 1 = city)
+        states = sorted(set([str(row[0]).strip() for row in rows if row[0] and str(row[0]).strip()]))
+        cities = sorted(set([str(row[1]).strip() for row in rows if row[1] and str(row[1]).strip()]))
         
         return {"states": states, "cities": cities}
     except Exception as e:
@@ -1006,24 +1007,22 @@ async def get_campaign_dashboard_filters_optimized(
         print(f"🟢 [Filters] Loading filter options (states={selected_states}, cities={selected_cities}, stores={selected_stores})")
         
         # CASCADING LOGIC IMPLEMENTATION:
+        # Using crm_store_dependency table (small dimension table with indexes) for fast lookups
         # 1. If stores are selected, get matching states and cities first (reverse dependency)
         if selected_stores:
-            # Get states and cities that match the selected stores
+            # Get states and cities that match the selected stores from crm_store_dependency
             store_info_query = select(
-                InvCrmAnalysisTcm.last_in_store_state,
-                InvCrmAnalysisTcm.last_in_store_city
+                CrmStoreDependency.state,
+                CrmStoreDependency.city
             ).distinct().where(
-                and_(
-                    InvCrmAnalysisTcm.last_in_store_name.in_(selected_stores),
-                    InvCrmAnalysisTcm.last_in_store_state.isnot(None),
-                    InvCrmAnalysisTcm.last_in_store_city.isnot(None),
-                )
+                CrmStoreDependency.store_name.in_(selected_stores)
             )
             store_info_results = await session.execute(store_info_query)
             store_info_rows = store_info_results.all()
-            matching_states = sorted(set([str(row.last_in_store_state).strip() for row in store_info_rows if row.last_in_store_state]))
-            matching_cities = sorted(set([str(row.last_in_store_city).strip() for row in store_info_rows if row.last_in_store_city]))
-            print(f"🟢 [Filters] Stores selected: found {len(matching_states)} matching states, {len(matching_cities)} matching cities")
+            # Access row data by column index (0 = state, 1 = city)
+            matching_states = sorted(set([str(row[0]).strip() for row in store_info_rows if row[0] and str(row[0]).strip()]))
+            matching_cities = sorted(set([str(row[1]).strip() for row in store_info_rows if row[1] and str(row[1]).strip()]))
+            print(f"🟢 [Filters] Stores selected: found {len(matching_states)} matching states, {len(matching_cities)} matching cities from crm_store_dependency")
             
             # Use matching states/cities for filtering, or merge with user selections
             effective_states = list(set(matching_states + selected_states)) if selected_states else matching_states
@@ -1032,89 +1031,59 @@ async def get_campaign_dashboard_filters_optimized(
             effective_states = selected_states
             effective_cities = selected_cities
         
-        # 2. Get distinct states
-        # CASCADING: If cities are selected, always show states that match those cities (even if states were also selected)
-        # This ensures states auto-adjust when cities are selected
+        # 2. Get distinct states from crm_store_dependency
         if effective_cities:
             # Cities selected: show only states that have those cities
-            # OPTIMIZED: Use LIMIT to prevent full table scan on large datasets
-            states_query = select(InvCrmAnalysisTcm.last_in_store_state).distinct().where(
-                and_(
-                    InvCrmAnalysisTcm.last_in_store_city.in_(effective_cities),
-                    InvCrmAnalysisTcm.last_in_store_state.isnot(None),
-                    InvCrmAnalysisTcm.last_in_store_state != "",
-                )
+            states_query = select(CrmStoreDependency.state).distinct().where(
+                CrmStoreDependency.city.in_(effective_cities)
             )
-            # If states were also selected, intersect with those (only show states that match both)
             if effective_states:
-                states_query = states_query.where(InvCrmAnalysisTcm.last_in_store_state.in_(effective_states))
-            states_query = states_query.order_by(InvCrmAnalysisTcm.last_in_store_state).limit(100)  # Limit for performance
+                states_query = states_query.where(CrmStoreDependency.state.in_(effective_states))
+            states_query = states_query.order_by(CrmStoreDependency.state)
         else:
             # No cities selected: get all states, or filter by selected states
-            states_query = select(InvCrmAnalysisTcm.last_in_store_state).distinct().where(
-                and_(
-                    InvCrmAnalysisTcm.last_in_store_state.isnot(None),
-                    InvCrmAnalysisTcm.last_in_store_state != "",
-                )
-            )
+            states_query = select(CrmStoreDependency.state).distinct()
             if effective_states:
-                states_query = states_query.where(InvCrmAnalysisTcm.last_in_store_state.in_(effective_states))
-            states_query = states_query.order_by(InvCrmAnalysisTcm.last_in_store_state)
+                states_query = states_query.where(CrmStoreDependency.state.in_(effective_states))
+            states_query = states_query.order_by(CrmStoreDependency.state)
         
         states_results = await session.execute(states_query)
-        # Deduplicate states (in case of any edge cases) and sort
-        states = sorted(list(set([str(row.last_in_store_state).strip() for row in states_results.all() if row.last_in_store_state])))
-        print(f"🟢 [Filters] Found {len(states)} unique states")
+        states = sorted(list(set([str(row).strip() for row in states_results.scalars().all() if row and str(row).strip()])))
+        print(f"🟢 [Filters] Found {len(states)} unique states from crm_store_dependency")
         
-        # 3. Get distinct cities
-        # Filter by effective states if any
-        cities_query = select(InvCrmAnalysisTcm.last_in_store_city).distinct().where(
-            and_(
-                InvCrmAnalysisTcm.last_in_store_city.isnot(None),
-                InvCrmAnalysisTcm.last_in_store_city != "",
-            )
-        )
+        # 3. Get distinct cities from crm_store_dependency
+        cities_query = select(CrmStoreDependency.city).distinct()
         if effective_states:
-            cities_query = cities_query.where(InvCrmAnalysisTcm.last_in_store_state.in_(effective_states))
+            cities_query = cities_query.where(CrmStoreDependency.state.in_(effective_states))
         if effective_cities:
-            # If cities are selected, only show those cities
-            cities_query = cities_query.where(InvCrmAnalysisTcm.last_in_store_city.in_(effective_cities))
-        cities_query = cities_query.order_by(InvCrmAnalysisTcm.last_in_store_city).limit(500)  # Limit for performance
+            cities_query = cities_query.where(CrmStoreDependency.city.in_(effective_cities))
+        cities_query = cities_query.order_by(CrmStoreDependency.city)
         cities_results = await session.execute(cities_query)
-        # Deduplicate cities (in case of any edge cases) and sort
-        cities = sorted(list(set([str(row.last_in_store_city).strip() for row in cities_results.all() if row.last_in_store_city])))
-        print(f"🟢 [Filters] Found {len(cities)} unique cities")
+        cities = sorted(list(set([str(row).strip() for row in cities_results.scalars().all() if row and str(row).strip()])))
+        print(f"🟢 [Filters] Found {len(cities)} unique cities from crm_store_dependency")
         
-        # 4. Get distinct store names
-        # Filter by effective states and cities
-        stores_query = select(InvCrmAnalysisTcm.last_in_store_name).distinct().where(
-            and_(
-                InvCrmAnalysisTcm.last_in_store_name.isnot(None),
-                InvCrmAnalysisTcm.last_in_store_name != "",
-            )
-        )
+        # 4. Get distinct store names from crm_store_dependency
+        stores_query = select(CrmStoreDependency.store_name).distinct()
         if effective_states:
-            stores_query = stores_query.where(InvCrmAnalysisTcm.last_in_store_state.in_(effective_states))
+            stores_query = stores_query.where(CrmStoreDependency.state.in_(effective_states))
         if effective_cities:
-            stores_query = stores_query.where(InvCrmAnalysisTcm.last_in_store_city.in_(effective_cities))
+            stores_query = stores_query.where(CrmStoreDependency.city.in_(effective_cities))
         if selected_stores:
-            # If stores are selected, only show those stores
-            stores_query = stores_query.where(InvCrmAnalysisTcm.last_in_store_name.in_(selected_stores))
-        stores_query = stores_query.order_by(InvCrmAnalysisTcm.last_in_store_name).limit(1000)  # Limit for performance
+            stores_query = stores_query.where(CrmStoreDependency.store_name.in_(selected_stores))
+        stores_query = stores_query.order_by(CrmStoreDependency.store_name)
         stores_results = await session.execute(stores_query)
-        # Deduplicate stores (in case of any edge cases) and sort
-        stores = sorted(list(set([str(row.last_in_store_name).strip() for row in stores_results.all() if row.last_in_store_name])))
-        print(f"🟢 [Filters] Found {len(stores)} unique stores")
+        stores = sorted(list(set([str(row).strip() for row in stores_results.scalars().all() if row and str(row).strip()])))
+        print(f"🟢 [Filters] Found {len(stores)} unique stores from crm_store_dependency")
         
-        # Get distinct segment maps
+        # Get distinct segment maps (still from fact table as it's not in dimension table)
         segments_query = select(InvCrmAnalysisTcm.segment_map).distinct().where(
             and_(
                 InvCrmAnalysisTcm.segment_map.isnot(None),
                 InvCrmAnalysisTcm.segment_map != "",
             )
-        ).order_by(InvCrmAnalysisTcm.segment_map)
+        ).order_by(InvCrmAnalysisTcm.segment_map).limit(100)  # Limit for performance
         segments_results = await session.execute(segments_query)
-        segment_maps = sorted([str(row.segment_map).strip() for row in segments_results.all() if row.segment_map])
+        segment_maps = sorted([str(row).strip() for row in segments_results.scalars().all() if row and str(row).strip()])
         print(f"🟢 [Filters] Found {len(segment_maps)} segment maps")
         
         # Predefined score values (1-5 for all RFM scores)
@@ -1145,7 +1114,7 @@ async def get_campaign_dashboard_filters_optimized(
         if "doesn't exist" in error_msg.lower() or "table" in error_msg.lower():
             raise HTTPException(
                 status_code=500,
-                detail=f"Database table 'crm_analysis_tcm' not found. Please create the table first. Error: {error_msg}"
+                detail=f"Database table 'crm_store_dependency' not found. Please create the table first. Error: {error_msg}"
             )
         raise HTTPException(
             status_code=500,

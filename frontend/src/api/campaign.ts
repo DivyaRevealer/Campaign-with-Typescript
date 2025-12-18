@@ -266,7 +266,6 @@ export interface FilterOptions {
   m_value_buckets: string[];
 }
 
-
 export interface CampaignDashboardOut {
   kpi: CampaignKPIData;
   r_score_data: ChartDataPoint[];
@@ -351,3 +350,4 @@ export const getStoresInfo = (stores: string[]): Promise<{ states: string[]; cit
   });
   return http.get<{ states: string[]; cities: string[] }>(`/campaign/dashboard/filters/stores-info?${params.toString()}`, { timeout: 10000 }).then((r) => r.data);
 };
+

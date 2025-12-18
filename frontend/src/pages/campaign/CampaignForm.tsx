@@ -526,16 +526,26 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
 
     useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
-        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) &&
-            wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        if (!isOpen) return;
+        
+        const target = event.target as Node;
+        // Check if click is inside dropdown
+        const isInsideDropdown = dropdownRef.current?.contains(target);
+        // Check if click is inside wrapper (the button)
+        const isInsideWrapper = wrapperRef.current?.contains(target);
+        
+        // Only close if clicking completely outside both
+        if (!isInsideDropdown && !isInsideWrapper) {
           setIsOpen(false);
           setDropdownPosition(null);
         }
       };
+      
       if (isOpen) {
-        document.addEventListener("mousedown", handleClickOutside);
+        // Use mousedown with capture to catch events early, but only close on actual outside clicks
+        document.addEventListener("mousedown", handleClickOutside, true);
         return () => {
-          document.removeEventListener("mousedown", handleClickOutside);
+          document.removeEventListener("mousedown", handleClickOutside, true);
         };
       }
     }, [isOpen]);
@@ -596,45 +606,72 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   ? `All (${selected.length})`
                   : `${selected.length} selected`}
             </div>
-            {isOpen && !disabled && (
-              <div 
-                className="multi-select-dropdown"
-                ref={dropdownRef}
-                style={{
-                  top: `${dropdownPosition?.top ?? 0}px`,
-                  left: `${dropdownPosition?.left ?? 0}px`,
-                  width: `${dropdownPosition?.width ?? 0}px`,
+          </div>
+          {isOpen && !disabled && dropdownPosition && (
+            <div 
+              className="multi-select-dropdown"
+              ref={dropdownRef}
+              onMouseDown={(e) => {
+                // Prevent mousedown from bubbling - this is critical to keep dropdown open
+                e.stopPropagation();
+                e.preventDefault();
+              }}
+              onClick={(e) => {
+                // Prevent clicks inside dropdown from closing it
+                e.stopPropagation();
+              }}
+              onMouseUp={(e) => {
+                // Also prevent mouseup from bubbling
+                e.stopPropagation();
+              }}
+              style={{
+                position: 'fixed',
+                top: `${dropdownPosition.top}px`,
+                left: `${dropdownPosition.left}px`,
+                width: `${dropdownPosition.width}px`,
+                zIndex: 1000,
+              }}
+            >
+              <div
+                className="multi-select-option"
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  handleChange(isAllSelected ? [] : [...allowed, ALL]);
+                  // Don't close dropdown - keep it open for multiple selections
                 }}
               >
+                <input type="checkbox" checked={isAllSelected} readOnly />
+                <span>{isAllSelected ? "All (selected)" : "All"}</span>
+              </div>
+              {allowed.map((v) => (
                 <div
+                  key={v}
                   className="multi-select-option"
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                  }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleChange(isAllSelected ? [] : [...allowed, ALL]);
+                    e.preventDefault();
+                    const newVals = selected.includes(v)
+                      ? selected.filter((s) => s !== v)
+                      : [...selected, v];
+                    handleChange(newVals);
+                    // Don't close dropdown - keep it open for multiple selections
                   }}
                 >
-                  <input type="checkbox" checked={isAllSelected} readOnly />
-                  <span>{isAllSelected ? "All (selected)" : "All"}</span>
+                  <input type="checkbox" checked={selected.includes(v)} readOnly />
+                  <span>{v}</span>
                 </div>
-                {allowed.map((v) => (
-                  <div
-                    key={v}
-                    className="multi-select-option"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const newVals = selected.includes(v)
-                        ? selected.filter((s) => s !== v)
-                        : [...selected, v];
-                      handleChange(newVals);
-                    }}
-                  >
-                    <input type="checkbox" checked={selected.includes(v)} readOnly />
-                    <span>{v}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
