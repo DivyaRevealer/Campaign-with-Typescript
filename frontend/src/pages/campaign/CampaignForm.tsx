@@ -525,9 +525,9 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
     const wrapperRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+      if (!isOpen) return; // Only attach listeners when dropdown is open
+      
       const handleClickOutside = (event: MouseEvent) => {
-        if (!isOpen) return;
-        
         const target = event.target as Node;
         // Check if click is inside dropdown
         const isInsideDropdown = dropdownRef.current?.contains(target);
@@ -540,14 +540,20 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
           setDropdownPosition(null);
         }
       };
+
+      const handleScroll = () => {
+        // Close dropdown when user scrolls
+        setIsOpen(false);
+        setDropdownPosition(null);
+      };
       
-      if (isOpen) {
-        // Use mousedown with capture to catch events early, but only close on actual outside clicks
-        document.addEventListener("mousedown", handleClickOutside, true);
-        return () => {
-          document.removeEventListener("mousedown", handleClickOutside, true);
-        };
-      }
+      // Use mousedown with capture to catch events early, but only close on actual outside clicks
+      document.addEventListener("mousedown", handleClickOutside, true);
+      window.addEventListener("scroll", handleScroll, true); // Use capture phase to catch all scrolls
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside, true);
+        window.removeEventListener("scroll", handleScroll, true);
+      };
     }, [isOpen]);
 
     useEffect(() => {
@@ -574,6 +580,11 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
     };
 
     const isAllSelected = allowed.length > 0 && selected.length === allowed.length;
+
+    const handleClearAll = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setForm((prev) => ({ ...prev, [name]: undefined }));
+    };
 
     const handleOpen = () => {
       if (!disabled) {
@@ -606,6 +617,11 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   ? `All (${selected.length})`
                   : `${selected.length} selected`}
             </div>
+            {selected.length > 0 && (
+              <span className="multi-select-clear" onClick={handleClearAll}>
+                ×
+              </span>
+            )}
           </div>
           {isOpen && !disabled && dropdownPosition && (
             <div 
@@ -701,17 +717,35 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
     const wrapperRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+      if (!isOpen) return; // Only attach listeners when dropdown is open
+      
       const handleClickOutside = (event: MouseEvent) => {
-        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        const target = event.target as Node;
+        // Check if click is inside dropdown
+        const isInsideDropdown = dropdownRef.current?.contains(target);
+        // Check if click is inside wrapper (the button)
+        const isInsideWrapper = wrapperRef.current?.contains(target);
+        
+        // Only close if clicking completely outside both
+        if (!isInsideDropdown && !isInsideWrapper) {
           setIsOpen(false);
           setDropdownPosition(null);
         }
       };
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
+
+      const handleScroll = () => {
+        // Close dropdown when user scrolls
+        setIsOpen(false);
+        setDropdownPosition(null);
       };
-    }, []);
+      
+      document.addEventListener("mousedown", handleClickOutside, true);
+      window.addEventListener("scroll", handleScroll, true); // Use capture phase to catch all scrolls
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside, true);
+        window.removeEventListener("scroll", handleScroll, true);
+      };
+    }, [isOpen]);
 
     useEffect(() => {
       if (isOpen && wrapperRef.current) {
@@ -749,6 +783,11 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
 
     const isAllSelected = allowed.length > 0 && selected.length === allowed.length;
 
+    const handleClearAll = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setForm((prev) => ({ ...prev, [name]: undefined }));
+    };
+
     const handleOpen = () => {
       if (!disabled) {
         setIsOpen(!isOpen);
@@ -780,6 +819,11 @@ export default function CampaignForm({ id: idProp, onClose, onSaved }: CampaignF
                   ? `All (${selected.length})`
                   : `${selected.length} selected`}
             </div>
+            {selected.length > 0 && (
+              <span className="multi-select-clear" onClick={handleClearAll}>
+                ×
+              </span>
+            )}
             {isOpen && !disabled && dropdownPosition && (
               <div 
                 className="multi-select-dropdown"
