@@ -168,6 +168,33 @@ async def _get_all_dashboard_data_single_query(
             func.sum(case((InvCrmAnalysisTcm.m_score == 4, 1), else_=0)).label("m_score_4"),
             func.sum(case((InvCrmAnalysisTcm.m_score == 5, 1), else_=0)).label("m_score_5"),
             
+            # ========== R VALUE DISTRIBUTION (using actual r_value field - days buckets) ==========
+            # R value represents days, bucket by actual day ranges
+            func.sum(case((and_(InvCrmAnalysisTcm.r_value >= 1, InvCrmAnalysisTcm.r_value <= 200), 1), else_=0)).label("r_value_bucket_1_200"),
+            func.sum(case((and_(InvCrmAnalysisTcm.r_value > 200, InvCrmAnalysisTcm.r_value <= 400), 1), else_=0)).label("r_value_bucket_200_400"),
+            func.sum(case((and_(InvCrmAnalysisTcm.r_value > 400, InvCrmAnalysisTcm.r_value <= 600), 1), else_=0)).label("r_value_bucket_400_600"),
+            func.sum(case((and_(InvCrmAnalysisTcm.r_value > 600, InvCrmAnalysisTcm.r_value <= 800), 1), else_=0)).label("r_value_bucket_600_800"),
+            func.sum(case((and_(InvCrmAnalysisTcm.r_value > 800, InvCrmAnalysisTcm.r_value <= 1000), 1), else_=0)).label("r_value_bucket_800_1000"),
+            func.sum(case((InvCrmAnalysisTcm.r_value > 1000, 1), else_=0)).label("r_value_bucket_1000_plus"),
+            
+            # ========== F VALUE DISTRIBUTION (using actual f_value field - visit count buckets) ==========
+            # F value represents number of visits, bucket by actual visit counts
+            func.sum(case((InvCrmAnalysisTcm.f_value == 1, 1), else_=0)).label("f_value_bucket_1"),
+            func.sum(case((InvCrmAnalysisTcm.f_value == 2, 1), else_=0)).label("f_value_bucket_2"),
+            func.sum(case((InvCrmAnalysisTcm.f_value == 3, 1), else_=0)).label("f_value_bucket_3"),
+            func.sum(case((InvCrmAnalysisTcm.f_value == 4, 1), else_=0)).label("f_value_bucket_4"),
+            func.sum(case((InvCrmAnalysisTcm.f_value == 5, 1), else_=0)).label("f_value_bucket_5"),
+            func.sum(case((InvCrmAnalysisTcm.f_value >= 6, 1), else_=0)).label("f_value_bucket_6_plus"),
+            
+            # ========== M VALUE DISTRIBUTION (using actual m_value field - monetary value buckets) ==========
+            # M value represents monetary value, bucket by actual value ranges
+            func.sum(case((and_(InvCrmAnalysisTcm.m_value >= 1, InvCrmAnalysisTcm.m_value <= 1000), 1), else_=0)).label("m_value_bucket_1_1000"),
+            func.sum(case((and_(InvCrmAnalysisTcm.m_value > 1000, InvCrmAnalysisTcm.m_value <= 2000), 1), else_=0)).label("m_value_bucket_1000_2000"),
+            func.sum(case((and_(InvCrmAnalysisTcm.m_value > 2000, InvCrmAnalysisTcm.m_value <= 3000), 1), else_=0)).label("m_value_bucket_2000_3000"),
+            func.sum(case((and_(InvCrmAnalysisTcm.m_value > 3000, InvCrmAnalysisTcm.m_value <= 4000), 1), else_=0)).label("m_value_bucket_3000_4000"),
+            func.sum(case((and_(InvCrmAnalysisTcm.m_value > 4000, InvCrmAnalysisTcm.m_value <= 5000), 1), else_=0)).label("m_value_bucket_4000_5000"),
+            func.sum(case((InvCrmAnalysisTcm.m_value > 5000, 1), else_=0)).label("m_value_bucket_5000_plus"),
+            
             # ========== DAYS BUCKETS (mutually exclusive) ==========
             func.sum(case((InvCrmAnalysisTcm.days <= 60, 1), else_=0)).label("days_0_2m"),
             func.sum(case((and_(InvCrmAnalysisTcm.days > 60, InvCrmAnalysisTcm.days <= 180), 1), else_=0)).label("days_3_6m"),
@@ -294,10 +321,107 @@ async def _get_all_dashboard_data_single_query(
             for score in range(1, 6)
         ]
         
-        # R-value bucket, visits, and value data are same as score data (different labels)
-        r_value_bucket_data = r_score_data.copy()
-        visits_data = f_score_data.copy()
-        value_data = m_score_data.copy()
+        # ========== BUILD R VALUE BUCKET DATA (using actual r_value days ranges) ==========
+        r_value_bucket_data = [
+            ChartDataPoint(
+                name="1-200 days",
+                value=float(getattr(row, "r_value_bucket_1_200", 0) or 0),
+                count=float(getattr(row, "r_value_bucket_1_200", 0) or 0)
+            ),
+            ChartDataPoint(
+                name="200-400 days",
+                value=float(getattr(row, "r_value_bucket_200_400", 0) or 0),
+                count=float(getattr(row, "r_value_bucket_200_400", 0) or 0)
+            ),
+            ChartDataPoint(
+                name="400-600 days",
+                value=float(getattr(row, "r_value_bucket_400_600", 0) or 0),
+                count=float(getattr(row, "r_value_bucket_400_600", 0) or 0)
+            ),
+            ChartDataPoint(
+                name="600-800 days",
+                value=float(getattr(row, "r_value_bucket_600_800", 0) or 0),
+                count=float(getattr(row, "r_value_bucket_600_800", 0) or 0)
+            ),
+            ChartDataPoint(
+                name="800-1000 days",
+                value=float(getattr(row, "r_value_bucket_800_1000", 0) or 0),
+                count=float(getattr(row, "r_value_bucket_800_1000", 0) or 0)
+            ),
+            ChartDataPoint(
+                name=">1000 days",
+                value=float(getattr(row, "r_value_bucket_1000_plus", 0) or 0),
+                count=float(getattr(row, "r_value_bucket_1000_plus", 0) or 0)
+            ),
+        ]
+        
+        # ========== BUILD F VALUE DATA (visits data using actual f_value visit counts) ==========
+        visits_data = [
+            ChartDataPoint(
+                name="1 visit",
+                value=float(getattr(row, "f_value_bucket_1", 0) or 0),
+                count=float(getattr(row, "f_value_bucket_1", 0) or 0)
+            ),
+            ChartDataPoint(
+                name="2 visits",
+                value=float(getattr(row, "f_value_bucket_2", 0) or 0),
+                count=float(getattr(row, "f_value_bucket_2", 0) or 0)
+            ),
+            ChartDataPoint(
+                name="3 visits",
+                value=float(getattr(row, "f_value_bucket_3", 0) or 0),
+                count=float(getattr(row, "f_value_bucket_3", 0) or 0)
+            ),
+            ChartDataPoint(
+                name="4 visits",
+                value=float(getattr(row, "f_value_bucket_4", 0) or 0),
+                count=float(getattr(row, "f_value_bucket_4", 0) or 0)
+            ),
+            ChartDataPoint(
+                name="5 visits",
+                value=float(getattr(row, "f_value_bucket_5", 0) or 0),
+                count=float(getattr(row, "f_value_bucket_5", 0) or 0)
+            ),
+            ChartDataPoint(
+                name="6 visits",
+                value=float(getattr(row, "f_value_bucket_6_plus", 0) or 0),
+                count=float(getattr(row, "f_value_bucket_6_plus", 0) or 0)
+            ),
+        ]
+        
+        # ========== BUILD M VALUE DATA (using actual m_value monetary ranges) ==========
+        value_data = [
+            ChartDataPoint(
+                name="1-1000",
+                value=float(getattr(row, "m_value_bucket_1_1000", 0) or 0),
+                count=float(getattr(row, "m_value_bucket_1_1000", 0) or 0)
+            ),
+            ChartDataPoint(
+                name="1000-2000",
+                value=float(getattr(row, "m_value_bucket_1000_2000", 0) or 0),
+                count=float(getattr(row, "m_value_bucket_1000_2000", 0) or 0)
+            ),
+            ChartDataPoint(
+                name="2000-3000",
+                value=float(getattr(row, "m_value_bucket_2000_3000", 0) or 0),
+                count=float(getattr(row, "m_value_bucket_2000_3000", 0) or 0)
+            ),
+            ChartDataPoint(
+                name="3000-4000",
+                value=float(getattr(row, "m_value_bucket_3000_4000", 0) or 0),
+                count=float(getattr(row, "m_value_bucket_3000_4000", 0) or 0)
+            ),
+            ChartDataPoint(
+                name="4000-5000",
+                value=float(getattr(row, "m_value_bucket_4000_5000", 0) or 0),
+                count=float(getattr(row, "m_value_bucket_4000_5000", 0) or 0)
+            ),
+            ChartDataPoint(
+                name=">5000",
+                value=float(getattr(row, "m_value_bucket_5000_plus", 0) or 0),
+                count=float(getattr(row, "m_value_bucket_5000_plus", 0) or 0)
+            ),
+        ]
         
         # ========== BUILD DAYS TO RETURN BUCKET DATA ==========
         days_to_return_data = [

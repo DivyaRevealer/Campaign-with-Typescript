@@ -1141,9 +1141,9 @@ export default function CampaignDashboard() {
         <div className="charts-row charts">
           <LazyChart>
             <div className="chart-container">
-              <h4>Total Customer by Recency Score</h4>
+              <h4>Total Customer by R value Bucket (Days)</h4>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={[...rValueBucketData].reverse()} layout="vertical" margin={{ top: 5, right: 50, left: 30, bottom: 5 }}>
+                <BarChart data={[...rValueBucketData].reverse()} layout="vertical" margin={{ top: 5, right: 50, left: 10, bottom: 5 }}>
                   <XAxis 
                     type="number" 
                     dataKey="value"
@@ -1158,13 +1158,13 @@ export default function CampaignDashboard() {
                   <YAxis 
                     dataKey="name" 
                     type="category"
-                    width={100}
+                    width={80}
                     tick={{ fontSize: 9 }}
                     label={{
-                      value: 'Recency Score',
+                      value: 'R value Bucket (Days)',
                       angle: -90,
                       position: 'insideLeft',
-                      offset: -5,
+                      offset: 0,
                       style: { textAnchor: 'middle' }
                     }}
                   />
@@ -1223,9 +1223,9 @@ export default function CampaignDashboard() {
           </LazyChart>
           <LazyChart>
             <div className="chart-container">
-              <h4>Total Customer by Frequency Score</h4>
+              <h4>Total Customer by No.of.visit</h4>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={[...visitsData].reverse()} layout="vertical" margin={{ top: 5, right: 50, left: 30, bottom: 5 }}>
+                <BarChart data={[...visitsData].reverse()} layout="vertical" margin={{ top: 5, right: 50, left: 10, bottom: 5 }}>
                   <XAxis
                     type="number"
                     dataKey="value"
@@ -1236,13 +1236,13 @@ export default function CampaignDashboard() {
                   <YAxis
                     dataKey="name"
                     type="category"
-                    width={100}
+                    width={80}
                     tick={{ fontSize: 9 }}
                     label={{ 
-                      value: 'Frequency Score', 
+                      value: 'No.of.visit', 
                       angle: -90, 
                       position: 'insideLeft',
-                      offset: -5,
+                      offset: 0,
                       style: { textAnchor: 'middle' }
                     }}
                   />
@@ -1301,9 +1301,9 @@ export default function CampaignDashboard() {
           </LazyChart>
           <LazyChart>
             <div className="chart-container">
-              <h4>Total Customer by Monetary Score</h4>
+              <h4>Total Customer by Value</h4>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={[...valueData].reverse()} layout="vertical" margin={{ top: 5, right: 50, left: 30, bottom: 5 }}>
+                <BarChart data={[...valueData].reverse()} layout="vertical" margin={{ top: 5, right: 50, left: 10, bottom: 5 }}>
                   <XAxis
                     type="number"
                     dataKey="value"
@@ -1314,13 +1314,13 @@ export default function CampaignDashboard() {
                   <YAxis
                     dataKey="name"
                     type="category"
-                    width={100}
+                    width={80}
                     tick={{ fontSize: 9 }}
                     label={{ 
-                      value: 'Monetary Score', 
+                      value: 'Value', 
                       angle: -90, 
                       position: 'insideLeft',
-                      offset: -5,
+                      offset: 0,
                       style: { textAnchor: 'middle' }
                     }}
                   />

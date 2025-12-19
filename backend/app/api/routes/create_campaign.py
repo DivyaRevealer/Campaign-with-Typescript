@@ -18,7 +18,7 @@ from app.core.db import get_session, repeatable_read_transaction
 from app.core.db_errors import raise_on_lock_conflict
 from app.core.deps import get_current_user
 from app.models.inv_create_campaign import InvCreateCampaign
-from app.models.inv_crm_analysis import InvCrmAnalysis
+from app.models.inv_crm_analysis_tcm import InvCrmAnalysisTcm
 from app.models.crm_store_dependency import CrmStoreDependency
 from app.models.inv_campaign_brand_filter import InvCampaignBrandFilter
 from app.models.inv_campaign_upload import InvCampaignUpload
@@ -52,7 +52,7 @@ async def get_campaign_options(
 ):
     """Get filter options for campaign creation."""
     try:
-        # RFM Scores from CRM analysis (distinct values) - matching reference implementation
+        # RFM Scores from crm_analysis_tcm (distinct values) - matching reference implementation
         r_scores: list[int] = []
         f_scores: list[int] = []
         m_scores: list[int] = []
@@ -89,20 +89,20 @@ async def get_campaign_options(
             return unique_sorted if unique_sorted else [1, 2, 3, 4, 5]
 
         try:
-            # Query R scores (matching reference: distinct, ordered, filter None)
-            r_score_query = select(InvCrmAnalysis.r_score).distinct().where(
-                InvCrmAnalysis.r_score.isnot(None)
-            ).order_by(InvCrmAnalysis.r_score)
+            # Query R scores from crm_analysis_tcm (distinct, ordered, filter None)
+            r_score_query = select(InvCrmAnalysisTcm.r_score).distinct().where(
+                InvCrmAnalysisTcm.r_score.isnot(None)
+            ).order_by(InvCrmAnalysisTcm.r_score)
             r_results = (await session.execute(r_score_query)).scalars().all()
             r_scores = clean_scores(r_results)
-            f_score_query = select(InvCrmAnalysis.f_score).distinct().where(
-                InvCrmAnalysis.f_score.isnot(None)
-            ).order_by(InvCrmAnalysis.f_score)
+            f_score_query = select(InvCrmAnalysisTcm.f_score).distinct().where(
+                InvCrmAnalysisTcm.f_score.isnot(None)
+            ).order_by(InvCrmAnalysisTcm.f_score)
             f_results = (await session.execute(f_score_query)).scalars().all()
             f_scores = clean_scores(f_results)
-            m_score_query = select(InvCrmAnalysis.m_score).distinct().where(
-                InvCrmAnalysis.m_score.isnot(None)
-            ).order_by(InvCrmAnalysis.m_score)
+            m_score_query = select(InvCrmAnalysisTcm.m_score).distinct().where(
+                InvCrmAnalysisTcm.m_score.isnot(None)
+            ).order_by(InvCrmAnalysisTcm.m_score)
             m_results = (await session.execute(m_score_query)).scalars().all()
             m_scores = clean_scores(m_results)
         except Exception as e:
@@ -115,12 +115,12 @@ async def get_campaign_options(
             f_scores = [1, 2, 3, 4, 5]
             m_scores = [1, 2, 3, 4, 5]
 
-        # RFM Segments from CRM analysis (matching reference implementation)
+        # RFM Segments from crm_analysis_tcm (matching reference implementation)
         rfm_segments: list[str] = []
         try:
-            segment_query = select(InvCrmAnalysis.segment_map).distinct().where(
-                InvCrmAnalysis.segment_map.isnot(None)
-            ).order_by(InvCrmAnalysis.segment_map)
+            segment_query = select(InvCrmAnalysisTcm.segment_map).distinct().where(
+                InvCrmAnalysisTcm.segment_map.isnot(None)
+            ).order_by(InvCrmAnalysisTcm.segment_map)
             segment_results = (await session.execute(segment_query)).scalars().all()
             rfm_segments = sorted([str(s) for s in segment_results if s])
         except Exception:
@@ -505,85 +505,85 @@ async def update_campaign(
 
 
 def _apply_campaign_filters(query, filters: CampaignCountRequest):
-    """Apply campaign filters to a CRM analysis query."""
+    """Apply campaign filters to a CRM analysis TCM query."""
     
     # Geography filters - check for non-empty lists
     if filters.branch and isinstance(filters.branch, list) and len(filters.branch) > 0:
-        query = query.where(InvCrmAnalysis.last_in_store_name.in_(filters.branch))
+        query = query.where(InvCrmAnalysisTcm.last_in_store_name.in_(filters.branch))
     if filters.city and isinstance(filters.city, list) and len(filters.city) > 0:
-        query = query.where(InvCrmAnalysis.last_in_store_city.in_(filters.city))
+        query = query.where(InvCrmAnalysisTcm.last_in_store_city.in_(filters.city))
     if filters.state and isinstance(filters.state, list) and len(filters.state) > 0:
-        query = query.where(InvCrmAnalysis.last_in_store_state.in_(filters.state))
+        query = query.where(InvCrmAnalysisTcm.last_in_store_state.in_(filters.state))
     
     # RFM Customized filters
     if filters.recency_op and filters.recency_min is not None:
         if filters.recency_op == "=":
-            query = query.where(InvCrmAnalysis.days == filters.recency_min)
+            query = query.where(InvCrmAnalysisTcm.days == filters.recency_min)
         elif filters.recency_op == ">=":
-            query = query.where(InvCrmAnalysis.days >= filters.recency_min)
+            query = query.where(InvCrmAnalysisTcm.days >= filters.recency_min)
         elif filters.recency_op == "<=":
-            query = query.where(InvCrmAnalysis.days <= filters.recency_min)
+            query = query.where(InvCrmAnalysisTcm.days <= filters.recency_min)
         elif filters.recency_op == "between" and filters.recency_max is not None:
             query = query.where(
                 and_(
-                    InvCrmAnalysis.days >= filters.recency_min,
-                    InvCrmAnalysis.days <= filters.recency_max
+                    InvCrmAnalysisTcm.days >= filters.recency_min,
+                    InvCrmAnalysisTcm.days <= filters.recency_max
                 )
             )
     
     if filters.frequency_op and filters.frequency_min is not None:
         if filters.frequency_op == "=":
-            query = query.where(InvCrmAnalysis.f_value == filters.frequency_min)
+            query = query.where(InvCrmAnalysisTcm.f_value == filters.frequency_min)
         elif filters.frequency_op == ">=":
-            query = query.where(InvCrmAnalysis.f_value >= filters.frequency_min)
+            query = query.where(InvCrmAnalysisTcm.f_value >= filters.frequency_min)
         elif filters.frequency_op == "<=":
-            query = query.where(InvCrmAnalysis.f_value <= filters.frequency_min)
+            query = query.where(InvCrmAnalysisTcm.f_value <= filters.frequency_min)
         elif filters.frequency_op == "between" and filters.frequency_max is not None:
             query = query.where(
                 and_(
-                    InvCrmAnalysis.f_value >= filters.frequency_min,
-                    InvCrmAnalysis.f_value <= filters.frequency_max
+                    InvCrmAnalysisTcm.f_value >= filters.frequency_min,
+                    InvCrmAnalysisTcm.f_value <= filters.frequency_max
                 )
             )
     
     if filters.monetary_op and filters.monetary_min is not None:
         if filters.monetary_op == "=":
-            query = query.where(InvCrmAnalysis.total_sales == filters.monetary_min)
+            query = query.where(InvCrmAnalysisTcm.total_sales == filters.monetary_min)
         elif filters.monetary_op == ">=":
-            query = query.where(InvCrmAnalysis.total_sales >= filters.monetary_min)
+            query = query.where(InvCrmAnalysisTcm.total_sales >= filters.monetary_min)
         elif filters.monetary_op == "<=":
-            query = query.where(InvCrmAnalysis.total_sales <= filters.monetary_min)
+            query = query.where(InvCrmAnalysisTcm.total_sales <= filters.monetary_min)
         elif filters.monetary_op == "between" and filters.monetary_max is not None:
             query = query.where(
                 and_(
-                    InvCrmAnalysis.total_sales >= filters.monetary_min,
-                    InvCrmAnalysis.total_sales <= filters.monetary_max
+                    InvCrmAnalysisTcm.total_sales >= filters.monetary_min,
+                    InvCrmAnalysisTcm.total_sales <= filters.monetary_max
                 )
             )
     
     # RFM Score filters - check for non-empty lists
     if filters.r_score and isinstance(filters.r_score, list) and len(filters.r_score) > 0:
-        query = query.where(InvCrmAnalysis.r_score.in_(filters.r_score))
+        query = query.where(InvCrmAnalysisTcm.r_score.in_(filters.r_score))
     if filters.f_score and isinstance(filters.f_score, list) and len(filters.f_score) > 0:
-        query = query.where(InvCrmAnalysis.f_score.in_(filters.f_score))
+        query = query.where(InvCrmAnalysisTcm.f_score.in_(filters.f_score))
     if filters.m_score and isinstance(filters.m_score, list) and len(filters.m_score) > 0:
-        query = query.where(InvCrmAnalysis.m_score.in_(filters.m_score))
+        query = query.where(InvCrmAnalysisTcm.m_score.in_(filters.m_score))
     if filters.rfm_segments and isinstance(filters.rfm_segments, list) and len(filters.rfm_segments) > 0:
-        query = query.where(InvCrmAnalysis.segment_map.in_(filters.rfm_segments))
+        query = query.where(InvCrmAnalysisTcm.segment_map.in_(filters.rfm_segments))
     
     # Occasion filters
     if filters.birthday_start:
-        query = query.where(InvCrmAnalysis.dob >= filters.birthday_start)
+        query = query.where(InvCrmAnalysisTcm.dob >= filters.birthday_start)
     if filters.birthday_end:
-        query = query.where(InvCrmAnalysis.dob <= filters.birthday_end)
+        query = query.where(InvCrmAnalysisTcm.dob <= filters.birthday_end)
     if filters.anniversary_start:
-        query = query.where(InvCrmAnalysis.anniv_dt >= filters.anniversary_start)
+        query = query.where(InvCrmAnalysisTcm.anniv_dt >= filters.anniversary_start)
     if filters.anniversary_end:
-        query = query.where(InvCrmAnalysis.anniv_dt <= filters.anniversary_end)
+        query = query.where(InvCrmAnalysisTcm.anniv_dt <= filters.anniversary_end)
     
     # Value threshold
     if filters.value_threshold is not None:
-        query = query.where(InvCrmAnalysis.total_sales >= filters.value_threshold)
+        query = query.where(InvCrmAnalysisTcm.total_sales >= filters.value_threshold)
     
     return query
 
@@ -600,15 +600,15 @@ async def count_campaign_customers(
     logger = logging.getLogger(__name__)
     
     try:
-        # Total customers
-        total_query = select(func.count(InvCrmAnalysis.cust_mobileno))
+        # Total customers from crm_analysis_tcm
+        total_query = select(func.count(InvCrmAnalysisTcm.cust_mobileno))
         total_count = (await session.execute(total_query)).scalar()
         if total_count is None:
             total_count = 0
         
         # Shortlisted customers (with filters applied)
         try:
-            shortlisted_query = select(func.count(InvCrmAnalysis.cust_mobileno))
+            shortlisted_query = select(func.count(InvCrmAnalysisTcm.cust_mobileno))
             logger.debug(f"Applying filters to query. Payload: {payload.model_dump(exclude_none=True)}")
             shortlisted_query = _apply_campaign_filters(shortlisted_query, payload)
             logger.debug(f"Query constructed successfully")
@@ -652,7 +652,7 @@ async def count_campaign_customers(
         if "doesn't exist" in error_msg.lower() or "table" in error_msg.lower():
             raise HTTPException(
                 status_code=500,
-                detail=f"Database table 'crm_analysis' not found. Please create the table first. Error: {error_msg}"
+                detail=f"Database table 'crm_analysis_tcm' not found. Please create the table first. Error: {error_msg}"
             )
         raise HTTPException(
             status_code=500,
